@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: wp_machine_learning
+Bundle-SymbolicName: wp_machine_learning
+Bundle-Version: 1.0.0
+Require-Bundle: rascal
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
