@@ -32,14 +32,8 @@ SingleLabel initMatrix(str version)
 	// Generate a relationship of all RegMaps in wpsum
 	RegMap regexps = (  nm : regexpForNameModel(nm) | <hn, _ > <- (wpsum.providedActionHooks + wpsum.providedFilterHooks), nm :=  nameModel(hn,wpsum));
 		
-	list[int] t = [];
-	list[list[int]] k = [];
-	
-	for(n <- [ 0 .. size(regexps) - 1 ] )
-		t += [0];
-	
-	for(n <- [ 0 .. size(regexps) - 1 ] )
-		k = k + [t];
+	list[int] t = [ 0 | n <- [ 0 .. ( size( regexps ) - 1 ) ] ]; 
+	list[list[int]] k  = [ t | n <- [ 0 .. ( size( regexps ) - 1 ) ] ]; 
 	
 	return <k, regexps, t>;
 }
@@ -96,7 +90,7 @@ SingleLabel trainWithAllClasses(str version)
     	if (psum.pInfo is pluginInfo && just(maxVersion) := psum.pInfo.testedUpTo && maxVersion == version ) 
 		{
 			count = count + 1;
-			if(count > 10) break;
+			//if(count > 10) break;
 			
 			println("Training with: <l.file>");
 			
@@ -122,7 +116,7 @@ SingleLabel trainWithAllClasses(str version)
 SingleLabel insertClusterHooks(list[NameOrExpr] hNames, PluginSummary psum, SingleLabel M)
 {	
 	// Create a list of each hooks index in M
-	list[int] hooks = hookIndexes(hNames, psum, M.regexps);
+	list[int] hooks = getIndexList(hNames, psum, M.regexps);
 	
     if(q != 0) println("\tBuilding Plugin Vector: size <size(hooks)>");
     	

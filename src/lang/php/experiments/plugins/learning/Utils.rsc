@@ -4,9 +4,11 @@ import lang::php::experiments::plugins::Plugins;
 import lang::php::experiments::plugins::Summary;
 import lang::php::ast::AbstractSyntax;
 
+import IO;
 import List;
 import Relation;
 import Map;
+import String;
 
 alias RegMap = map[NameModel model, str regexp];
 alias HookModels = rel[NameOrExpr hookName, loc at, NameModel model];
@@ -23,8 +25,20 @@ void printMatrix(list[list[int]] i)
 	}
 }
 
-/* Return the index of 'hnUse' in 'r' */
-int getListIndex(NameOrExpr hnUse, PluginSummary psum, RegMap regexps)
+/* Return the list of indexes corresponding
+to the list of NameOrExpr provided */
+list[int] getIndexList(list[NameOrExpr] hooks, PluginSummary psum, RegMap regexps)
+{
+	list[int] hIndex = [];
+	
+	for( h <- hooks )
+		hIndex += getIndexList(h, psum, regexps);
+		
+	return hIndex;
+}
+
+/* Return the index of 'hnUse' in 'regexps' */
+int getIndexList(NameOrExpr hnUse, PluginSummary psum, RegMap regexps)
 {
 	int i = 0;
 	
@@ -45,19 +59,6 @@ int getListIndex(NameOrExpr hnUse, PluginSummary psum, RegMap regexps)
 	return -1;
 }
 
-
-/* Return the list of indexes corresponding
-to the list of NameOrExpr provided */
-list[int] hookIndexes(list[NameOrExpr] hooks, PluginSummary psum, RegMap regexps)
-{
-	list[int] hIndex = [];
-	
-	for( h <- hooks )
-		hIndex += getListIndex(h, psum, regexps);
-		
-	return hIndex;
-}
-
 /* Return the index of the provided string in M.matrix */
 int getStringIndex(str k, RegMap regexps)
 {
@@ -73,7 +74,7 @@ int getStringIndex(str k, RegMap regexps)
 
 /* Return the string value represented 
 index k in the provided MultiLabel*/
-str getIndexString(int k, RegMap regexps)
+str getIndexListString(int k, RegMap regexps)
 {
 	int i = 0;
 	

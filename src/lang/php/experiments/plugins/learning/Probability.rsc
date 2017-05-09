@@ -119,7 +119,7 @@ HookMatrix trainWithAllClasses(str version)
 HookMatrix insertClusterHooks(list[NameOrExpr] hNames, PluginSummary psum, HookMatrix M)
 {	
 	// Create a list of each hooks index in M
-	list[int] hooks = hookIndexes(hNames, psum, M.regexps);
+	list[int] hooks = getIndexList(hNames, psum, M.regexps);
 	
     if(q != 0) println("\tInserting clustered hooks: size <size(hooks)>");
     
@@ -185,7 +185,7 @@ lrel[str,num, num] findProbable(HookMatrix M)
 	i = reverse(tail(invert(sort(invert(i))), 10));
 
 	// Return < Name of Plugin, Plugin Index, Probability >
-	return  [ <n, e, p> | <e, p> <- i , n:= getIndexString(e, M.regexps)];
+	return  [ <n, e, p> | <e, p> <- i , n:= getIndexListString(e, M.regexps)];
 }
 
 /* Find the conditional probability of the top 
@@ -207,7 +207,7 @@ lrel[str, num, num] findProbable(list[int] given, HookMatrix M)
 	i = reverse(tail(invert(sort(invert(i))), 10));
 	
 	// Return < Name of Plugin, Plugin Index, Probability >
-	return [ <n, e, p> | <e, p> <- i , n:= getIndexString(e, M.regexps)];
+	return [ <n, e, p> | <e, p> <- i , n:= getIndexListString(e, M.regexps)];
 }
 
 /* Insert k to i if k<0> doesn't exist in i, or
