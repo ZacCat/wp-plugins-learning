@@ -28,6 +28,6 @@ def genMatrix( str ):
 	m = []
 
 	for item in lst:
-			m.append(item.split(','))
+		m.append(item.split(','))
 
 	return m
