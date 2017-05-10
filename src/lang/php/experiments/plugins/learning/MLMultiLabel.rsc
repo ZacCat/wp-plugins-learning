@@ -27,18 +27,21 @@ alias MultiLabel = tuple[ list[list[int]] fMatrix, RegMap fReg ,  list[list[int]
 
 list[NameOrExpr] includedFeatures(PluginSummary psum, loc container = |file:///|)
 {
-	bool useLoc = container != |file:///|;	
-	
-	list[NameOrExpr] fL = [ f | < f, at, _> <- ( psum.postMetaKeys + psum.userMetaKeys ), useLoc ? true : insideLoc(at, container) ];
-	
+	bool useLoc = container != |file:///|;
+		
+	// Removes ".*" regex expressions
+	list[NameOrExpr] fL = [ f | < f, at, _> <- ( psum.postMetaKeys + psum.userMetaKeys ), useLoc ? true : insideLoc(at, container), pp(f) != ".*" ];
+
 	return fL;
 }
 
 RegMap featureRegMap(PluginSummary wpsum)
 {
-	RegMap fL = ( nm : regexpForNameModel(nm) | <hn, _ > <- (wpsum.providedActionHooks + wpsum.providedFilterHooks), nm :=  nameModel(hn,wpsum));	
+	// Removes ".*" regex expressions
+	RegMap fL = ( nm : e | <hn, _ > <- (wpsum.providedActionHooks + wpsum.providedFilterHooks), nm :=  nameModel(hn,wpsum), e := regexpForNameModel(nm), e != ".*");	
 	
-	fL += ( fN : regexpForNameModel(fN) | < f, _, _> <- ( wpsum.postMetaKeys + wpsum.userMetaKeys ), fN :=  nameModel(f,wpsum));
+	// Removes ".*" regex expressions	
+	fL += ( fN : e | < f, _, _> <- ( wpsum.postMetaKeys + wpsum.userMetaKeys ), fN :=  nameModel(f,wpsum), e := regexpForNameModel(fN), e != ".*");
 	
 	return fL;
 }
@@ -49,17 +52,14 @@ MultiLabel initMatrix(str version)
 	PluginSummary wpsum = loadWordpressPluginSummary(version);
 	
 	// Generate a relationship of all RegMaps in wpsum, also serves as a label list
-	RegMap lReg = ( nm : regexpForNameModel(nm) | <hn, _ > <- (wpsum.providedActionHooks + wpsum.providedFilterHooks), nm :=  nameModel(hn,wpsum));
-	
-	
-	list[int] lVector  = [ 0 | n <- [ 0 .. ( size( lReg ) - 1 ) ] ]; 	
-	
+	RegMap lReg = ( nm : e | <hn, _ > <- (wpsum.providedActionHooks + wpsum.providedFilterHooks), nm :=  nameModel(hn,wpsum), e := regexpForNameModel(nm), e != ".*");
+		
 	// Generate list of feature's regex
 	RegMap fReg = featureRegMap(wpsum);
 	
 	list[int] fVector = [ 0 | n <- [ 0 .. ( size( fReg ) - 1 ) ] ]; 
 	
-	return <[fVector], fReg, [lVector], lReg>;
+	return <[fVector], fReg, [], lReg>;
 }
 
 /* Create a new MultiLabel populated with information generated 
@@ -101,19 +101,21 @@ MultiLabel trainWithAllClasses(str version)
 	MultiLabel M = initMatrix(version);
 
     pluginDirs = sort([l | l <- pluginDir.ls, isDirectory(l) ]);
-	
+	int c = 0;
     for (l <- pluginDirs, exists(getPluginBinLoc(l.file)), exists(infoBin+"<l.file>-hook-uses.bin")) {
  		
     	PluginSummary psum = loadPluginSummary(l.file);
  
     	if (psum.pInfo is pluginInfo && just(maxVersion) := psum.pInfo.testedUpTo && maxVersion == version ) 
-		{			
+		{		
+			c += 1;
+			//if( c == 5 ) break;	
 			println("Training with: <l.file>");
 			
 			for(<_, at,_> <- psum.classes )
 			{
 				// Extract all hooks (labels) from the class
-				list[NameOrExpr] lNames = [hn | <hn, e,_,_> <- (psum.filters + psum.actions), insideLoc(e, at)];	
+				list[NameOrExpr] lNames = [hn | <hn, e,_,_> <- (psum.filters + psum.actions), insideLoc(e, at), pp(hn) != ".*"];	
 				// Extract all non-hook features from the class	
 				list[NameOrExpr] fNames = includedFeatures(psum, container = at);
 				
@@ -123,7 +125,10 @@ MultiLabel trainWithAllClasses(str version)
 	}
 
 	// Save M to file
-	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-Features-<version>.txt|, M.fMatrix);
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-fMatrix-<version>.txt|, M.fMatrix);
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-Features-<version>.txt|, [ e | n <- M.fReg, e := M.fReg[n] ] );
+	
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-lMatrix-<version>.txt|, M.fMatrix);
 	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-Labels-<version>.txt|, [ e | n <- M.lReg, e := M.lReg[n] ] );
 
 	return M;
@@ -133,7 +138,6 @@ MultiLabel trainWithAllClasses(str version)
 MultiLabel insertClusterHooks(list[NameOrExpr] lNames, list[NameOrExpr] fNames, PluginSummary psum, MultiLabel M)
 {	
 	list[int] fV = M.fMatrix[0];
-	list[int] lV = M.lMatrix[0];
 	
 	// Create a list of each label's index in M
 	list[int] lIndex = getIndexList(lNames, psum, M.lReg);
@@ -143,20 +147,17 @@ MultiLabel insertClusterHooks(list[NameOrExpr] lNames, list[NameOrExpr] fNames, 
     if(q != 0) println("\tBuilding Feature and List Vectors: size <size(fIndex + lIndex)>");
     	
 	// Generate label values
-	for( l <- ( lIndex ) )	
-	{
+	for( l <- ( lIndex ), l >= 0 )	
 		fV[l] += 1;	
-		lV[l] += 1;
-	}
 	
 	// Generate feature values
-	for( f <- ( fIndex ) )				
+	for( f <- ( fIndex ), f >= 0 )				
 		fV[f] += 1;
 
 
 	if(q != 0)println("\tVectors Resolved");	
 
-	M.lMatrix += [lV];
+	M.lMatrix += [lIndex];
 	M.fMatrix += [fV];
 	
 	return M;
