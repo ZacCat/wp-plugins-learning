@@ -29,7 +29,7 @@ list[NameOrExpr] includedFeatures(PluginSummary psum, loc container = |file:///|
 {
 	bool useLoc = container != |file:///|;
 		
-	// Removes ".*" regex expressions
+	// Removes ".*" regex exprescleasions
 	list[NameOrExpr] fL = [ f | < f, at, _> <- ( psum.postMetaKeys + psum.userMetaKeys ), useLoc ? true : insideLoc(at, container), pp(f) != ".*" ];
 
 	return fL;
@@ -88,8 +88,11 @@ MultiLabel trainWithAllPlugins(str version)
 	}
 
 	// Save M to file
-	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/Training-Plugin-<version>.txt|, M);
-
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByPlugin-fMatrix-<version>.txt|, M.fMatrix);
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByPlugin-Features-<version>.txt|, [ e | n <- M.fReg, e := M.fReg[n] ] );
+	
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByPlugin-lMatrix-<version>.txt|, M.lMatrix);
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByPlugin-Labels-<version>.txt|, [ e | n <- M.lReg, e := M.lReg[n] ] );
 	return M;
 }
 
@@ -128,7 +131,7 @@ MultiLabel trainWithAllClasses(str version)
 	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-fMatrix-<version>.txt|, M.fMatrix);
 	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-Features-<version>.txt|, [ e | n <- M.fReg, e := M.fReg[n] ] );
 	
-	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-lMatrix-<version>.txt|, M.fMatrix);
+	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-lMatrix-<version>.txt|, M.lMatrix);
 	writeTextValueFile(|file:///home/zac/corpus/training/MultiLabel/TrainByClass-Labels-<version>.txt|, [ e | n <- M.lReg, e := M.lReg[n] ] );
 
 	return M;
@@ -143,9 +146,9 @@ MultiLabel insertClusterHooks(list[NameOrExpr] lNames, list[NameOrExpr] fNames, 
 	list[int] lIndex = getIndexList(lNames, psum, M.lReg);
 	// Create a list of each feature's index in M
 	list[int] fIndex = getIndexList(fNames, psum, M.fReg);
-	
+	    	
     if(q != 0) println("\tBuilding Feature and List Vectors: size <size(fIndex + lIndex)>");
-    	
+	
 	// Generate label values
 	for( l <- ( lIndex ), l >= 0 )	
 		fV[l] += 1;	
@@ -153,7 +156,6 @@ MultiLabel insertClusterHooks(list[NameOrExpr] lNames, list[NameOrExpr] fNames, 
 	// Generate feature values
 	for( f <- ( fIndex ), f >= 0 )				
 		fV[f] += 1;
-
 
 	if(q != 0)println("\tVectors Resolved");	
 
