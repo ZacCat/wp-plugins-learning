@@ -25,18 +25,6 @@ void printMatrix(list[list[int]] i)
 	}
 }
 
-/* Return the list of indexes corresponding
-to the list of NameOrExpr provided */
-list[int] getIndexList(list[NameOrExpr] hooks, PluginSummary psum, RegMap regexps)
-{
-	list[int] hIndex = [];
-	
-	for( h <- hooks )
-		hIndex += getIndexList(h, psum, regexps);
-		
-	return hIndex;
-}
-
 /* Return the index of 'hnUse' in 'regexps' */
 int getIndexList(NameOrExpr hnUse, PluginSummary psum, RegMap regexps)
 {
