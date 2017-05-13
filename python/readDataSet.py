@@ -15,6 +15,7 @@ def genLoc( str ):
 def genList( str ):
 	s = open(genLoc( str )).readline()
 	s = s[1 : len(s) - 1].replace('\"', '')
+
 	return s.split(',')
 
 # Read in either:
@@ -22,7 +23,7 @@ def genList( str ):
 # Label Matrix ( str = lMatrix )
 def genMatrix( str ):
 	s = open(genLoc( str )).readline()
-	s = s[2 : len(s) - 2]
+	s = s[2 : len(s) - 2].replace('"', '')
 	lst = s.split('],[')
 
 	m = []
