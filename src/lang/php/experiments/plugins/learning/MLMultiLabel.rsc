@@ -163,7 +163,7 @@ MultiLabel insertClusteredFeatures(list[NameOrExpr] lNames, list[NameOrExpr] fNa
 	// list[int] fIndex = lIndex + [ e | h <- fNames, e :=  getIndexList(h, psum, M.fReg), e >=0 ];
 
 	/** Since only hooks are being considered **/
-	list[int] fIndex = lIndex
+	list[int] fIndex = lIndex;
 
     if(q != 0) println("\tBuilding Feature and List Vectors: size <size(fIndex + lIndex)>");
 	
@@ -178,4 +178,3 @@ MultiLabel insertClusteredFeatures(list[NameOrExpr] lNames, list[NameOrExpr] fNa
 	
 	return M;
 }
-
