@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/PHPAnalysis"/>
+	<classpathentry kind="lib" path="/Plugins/lib/rascal_0.8.0.201510231458.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/Plugins"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
