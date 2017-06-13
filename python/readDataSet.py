@@ -2,12 +2,15 @@
 
 # Training method eg. Train by class, or Train by Plugin
 trainMethod = 'Class'
+
 # Desired WP Version
 version = '4.3'
 
+baseLoc = '/home/zac/corpus/training/Unsupervised'
+
 # Generate the file location, given Features, fMatrix, Labels, lMatrix 
 def genLoc( str ):
-	return '/home/zac/corpus/training/MultiLabel/TrainBy' + trainMethod + "-" + str + '-' + version + '.txt'
+	return baseLoc + '/TrainBy' + trainMethod + "-" + str + '-' + version + '.txt'
 
 # Read in either array of either:
 # Feature names ( str = Features )

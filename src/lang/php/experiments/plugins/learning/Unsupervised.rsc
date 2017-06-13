@@ -1,34 +1,30 @@
 module lang::php::experiments::plugins::learning::Unsupervised
 
-import lang::php::util::Config;
-import lang::php::experiments::plugins::Plugins;
-import lang::php::experiments::plugins::Summary;
-import lang::php::ast::AbstractSyntax;
-import lang::php::experiments::plugins::Locations;
 import lang::php::util::Utils;
-import lang::php::pp::PrettyPrinter;
+import lang::php::util::Config;
+import lang::php::ast::AbstractSyntax;
+import lang::php::experiments::plugins::Summary;
+import lang::php::experiments::plugins::Plugins;
 import lang::php::experiments::plugins::learning::Utils;
 
 import IO;
-import Set;
-import List;
-import Relation;
-import ValueIO;
 import Map;
+import List;
+import ValueIO;
 import ListRelation;
-import String;
-import Type;
 
-import util::Math;
-
-int q = 0;
+/* Prediction threshold */
 real pThres = .5;
 
-alias Cluster = tuple[ Matrix[int] fMatrix, list[int] fVector, RegMap fReg];
+alias MatrixReg = tuple[ Matrix[int] fMatrix, RegMap fReg];
 
+/********************************************************************
+							Test Functions
+********************************************************************/
+
+/* Test using clusters generated in python */
 void run(str version)
 {
-	//Cluster C = readBinaryValueFile(baseLoc + "/training/Cluster/TrainByClass-Cluster-<version>.bin");
 	Matrix[real] K = getPy();
 	
 	int sz = size(K[0]);
@@ -36,29 +32,22 @@ void run(str version)
 	findNearestCluster(testBinarize([8], sz), K);
 }
 
-// Read a list of clusters generated in python
-Matrix[real] getPy()
-{
-	return readPyMatrix(|file:///home/zac/git/wp-plugin-learning/python/array.txt|);
-}
+/* Read a list of clusters generated in python */
+Matrix[real] getPy() = readPyMatrix(|file:///home/zac/git/wp-plugin-learning/python/array.txt|);
+
+/********************************************************************
+							Build Functions 
+********************************************************************/
 
 /* Populate an empty Cluster */
-Cluster initMatrix(str version)
-{
-	PluginSummary wpsum = loadWordpressPluginSummary(version);
-	
-	// Generate a relationship of all RegMaps in wpsum, also serves as a label list
-	RegMap fReg = labelRegMap(wpsum);
+MatrixReg initMatrix(str version) =  <[],  labelRegMap( loadWordpressPluginSummary(version))>;
 
-	return <[], [ 0 | n <- [ 0 .. size( fReg ) ] ],  fReg>;
-}
-
-/* Create a new Cluster populated with information generated 
-from all plugins compatible with the given WordPress version,
-relations determined by classes */
-Cluster trainWithAllClasses(str version)
+/* Create a new MatrixReg populated with information generated 
+   from all plugins compatible with the given WordPress version,
+   relations determined by classes */
+MatrixReg trainWithAllClasses(str version)
 {
-	Cluster M = initMatrix(version);
+	MatrixReg M = initMatrix(version);
 
     pluginDirs = sort([l | l <- pluginDir.ls, isDirectory(l) ]);
     for (l <- pluginDirs, exists(getPluginBinLoc(l.file)), exists(infoBin+"<l.file>-hook-uses.bin")) {
@@ -71,68 +60,47 @@ Cluster trainWithAllClasses(str version)
 			
 			for(<_, at,_> <- psum.classes )
 			{
-				// Extract all non-hook features from the class	
-				list[NameOrExpr] fNames = [hn | <hn, e,_,_> <- (psum.filters + psum.actions), insideLoc(e, at), pp(hn) != ".*"];	
+				list[NameOrExpr] fNames = featureList(psum, at);	
 				
 				M = insertSampleFeatures(fNames, psum, M);
 			}
 		}
 	}
-			
-	// Save M to file
-	writeTextValueFile(baseLoc + "/training/Cluster/TrainByClass-fMatrix-<version>.txt", M.fMatrix);
-	writeTextValueFile(baseLoc + "/training/Cluster/TrainByClass-Features-<version>.txt",  ( i : e  | <i,_,e> <- M.fReg ));
-	writeBinaryValueFile(baseLoc + "/training/Cluster/TrainByClass-Cluster-<version>.bin", M);
+	
+	M = reduceDimensionality(M);
+	
+	/* Save M to file */
+	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt", M.fMatrix);
+	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt",  [ <i , e>  | <i,_,e> <- M.fReg ]);
+	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-MatrixReg-<version>.bin", M);
 	return M ;
 }
 
 /* Insert all feature relationships shown in the provided PluginSummary */
-Cluster insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, Cluster M)
+MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, MatrixReg M)
 {	
-	// Create a list of each feature's index in M
+	/* Create a list of each feature's index in M */
 	list[int] fIndex = dup([ e | h <- fNames, e :=  getIndexList(h, psum, M.fReg), e >=0 ]);
 
+	/* Do not add sample with < 2 hooks */
 	if(size(fIndex) <= 1) return M;	
-
-	if(q != 0)println("\tVectors Resolved");	
 
 	M.fMatrix += [fIndex];
 	
 	return M;
 }
 
-// Find the nearest cluster from a predefined list of clusters M 
-// Using Manhattan Distance
-list[tuple[num, int]] findNearestCluster( list[int] V, Matrix[real] M )
-{
-	list[tuple[num, int]] D = [];
-	int i = 0;
-	for( n <- M, e:= dist(V, n))
-	{
-		if(e >= pThres) D += [ <e, i> ];
-		i += 1;
-	}
-	
-	return reverse(sort(D));
-}
+/********************************************************************
+					Unimplemented Functions
+********************************************************************/
 
-// Predict using the nearest cluser
-list[int] predictKNN( int i, Matrix[real] M )
+/* TODO: Implement real dimensionality reduction
+         algorithm.
+   Currently: Doesn't remove much; used to re-index
+              fReg.  */
+MatrixReg reduceDimensionality( MatrixReg M )
 {
-	list[int] ret = [];
-	int k = 0;
-	for( n <- M[i] )
-	{
-		if( n > pThes ) ret += k;
-		k += 1;
-	}
-	return ret;
-}
-
-// Unused
-Cluster reduceDimensionality( Cluster M )
-{
-	// ( plugin index : < # of classes with plugin, # of total plugins in each of the classes > ) 
+	/* ( plugin index : < # of classes with plugin, # of total plugins in each of the classes > )*/ 
 	map[ int, tuple[ int, int ] ] usage = ( i : < 0, 0> | < i, _,_ > <- M.fReg );
 	
 	for( r <- M.fMatrix, k <- r, e := usage[k], s := sum(r) ) usage[k] = < e<0> + 1, e<1> + s >;
@@ -147,7 +115,18 @@ Cluster reduceDimensionality( Cluster M )
 
 		lrel[NameModel, str] j = M.fReg[{i}];
 		for( <n, s>  <- j) M.fReg = M.fReg - <i, n, s>;
+		
 	}
-
+	
+	RegMap newReg = [];
+		
+	int i = 0;
+	for( < _, n, s> <- M.fReg)
+	{
+		newReg += <i, n, s>;
+		i += 1;
+	}
+	
+	M.fReg = newReg;
 	return  M;
 }
