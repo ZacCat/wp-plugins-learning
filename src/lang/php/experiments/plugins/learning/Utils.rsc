@@ -46,11 +46,11 @@ Matrix[int] binarize( Matrix[int] M )
 
 /* Create a vector of size 'size' with values in indexes
    'val' represented with a 1 */
-list[int] testBinarize ( list[int] val, int size )
+list[int] testBinarize ( list[int] val, int sz )
 {
 	int i = 0;
 	list[int] B = [];
-	for( n <- [0.. size] )
+	for( n <- [0.. sz] )
 	{
 		if( i in val ) B += 1;
 		else B += 0;
@@ -65,13 +65,7 @@ list[int] testBinarize ( list[int] val, int size )
 ********************************************************************/
 
 /* Manhattan Distance */
-num dist( list[num] p, list[num] q )
-{
-	num d = 0;
-	for ( i <- p, n <- q )
-		d += abs( n - i );
-	return d;
-}
+real dist( list[num] p, list[num] q )= toReal(sum([ d | i <- index(p),d := abs( p[i] - q[i] )]));
 
 /********************************************************************
 						Matrix Functions
@@ -94,9 +88,6 @@ num cAverage( Matrix[int] M )
 	for ( s <- M, e := size(s) ) m += e;
 	return m;
 }
-
-/* Returns the average value of a dimension in a Matrix */
-list[real] midVector( int d, Matrix[real] M ) = M[sort([ <e, n> | n <- index(M), e:= M[n][d] ])[floor( size(M) / 2 )][1]];
 
 /* Returns the average value of a dimension in a Matrix
    Unused */
@@ -139,6 +130,14 @@ Matrix[real] readPyMatrix( loc at )
 		ret += [[toReal(n) | n <- split(" ", s)]];
 	
 	return ret;
+}
+
+/* Read a list of reals from file */
+list[int] readPyList( loc at )
+{
+	list[str] lines = readFileLines(at);
+	
+	return  [ toInt(toReal(s)) | s <- lines];
 }
 
 /********************************************************************
