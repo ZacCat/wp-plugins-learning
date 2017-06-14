@@ -5,6 +5,7 @@ import lang::php::util::Config;
 import lang::php::ast::AbstractSyntax;
 import lang::php::experiments::plugins::Summary;
 import lang::php::experiments::plugins::Plugins;
+import lang::php::experiments::plugins::Locations; 
 import lang::php::experiments::plugins::learning::Utils;
 
 import IO;

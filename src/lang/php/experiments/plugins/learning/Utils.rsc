@@ -1,9 +1,9 @@
 module lang::php::experiments::plugins::learning::Utils
  
+import lang::php::pp::PrettyPrinter;
 import lang::php::ast::AbstractSyntax;
 import lang::php::experiments::plugins::Plugins;
 import lang::php::experiments::plugins::Summary;
-
 import IO;
 import Map;
 import List;
