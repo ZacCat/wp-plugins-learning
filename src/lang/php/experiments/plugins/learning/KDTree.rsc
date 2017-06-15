@@ -6,25 +6,36 @@ import lang::php::experiments::plugins::learning::Utils;
 import IO;
 import List;
 import String;
-
+import Map;
 import util::Math;
 
 /* Prediction threshold */
-real pThres = 0.1;
+real pThres = 0.01;
 
 /* represents a hyperrectangle */ 
 alias KRegion = tuple[ list[real] min, list[real] max ];
 /* kd-tree datatype */
-data KDT = leaf( list[real] V)
-			| kdtNode(int dim, list[real] V, KRegion B, KDT L, KDT R) 
-			| kdtNode(int dim, list[real] V, KRegion B, KDT L); 
+data KDT = leaf( real w, list[real] V)
+			| kdtNode(int dim, real w, list[real] V, KRegion B, KDT L, KDT R) 
+			| kdtNode(int dim, real w, list[real] V, KRegion B, KDT L); 
+alias CTup = tuple[real w, list[real] V];
 
 /********************************************************************
 							Testing functions
 ********************************************************************/
 
-KDT readKDT() = genKDT( readPyMatrix(baseLoc + "/training/Unsupervised/TrainByClass-KMCarray1635-4.3.txt") );
-
+KDT readKDT() = genKDT(genKDTTuple(readPyList(baseLoc + "/training/Unsupervised/TrainByClass-KMClabels1500-4.3.txt"), readPyMatrix(baseLoc + "/training/Unsupervised/TrainByClass-KMCarray1500-4.3.txt")));
+				 
+list[CTup] genKDTTuple( list[int] w, Matrix[real] M){
+	map[int, int] wFreq = distribution(w);
+	if(size(M) != size(wFreq))
+	{
+		println("Incompatible paramaters");
+		return [];
+	}
+	
+ 	return [ < wFreq[i] + 0.0, M[i] > | i <- index( M ) ];
+}
 lrel[num, str, int] tst(KDT K, list[int] p)
 {
 	Matrix[real] M =  readPyMatrix(baseLoc + "/training/Unsupervised/TrainByClass-KMCarray1635-4.3.txt");
@@ -57,26 +68,26 @@ KRegion startKRegion( Matrix[real] M )
 }
 
 // TODO: Split dimension with highest spread to better balance tree
-KDT genKDT( Matrix[real] M, int d = 1 ) = genKDT(M, startKRegion(M));
+KDT genKDT( list[CTup] M, int d = 1 ) = genKDT(M, startKRegion(M<1>));
 /* Builds a KDT from a matrix */
-KDT genKDT( Matrix[real] M, KRegion bound, int d = 1 )
+KDT genKDT( list[CTup] M, KRegion bound, int d = 1 )
 {
-	if (size( M ) == 1) return leaf(M[0]);
+	if (size( M ) == 1) return leaf(M[0].w, M[0].V);
 	
-	int dim = d % size(M[0]);
+	int dim = d % size(M[0].V);
 
-	Matrix[real] L = [];
-	Matrix[real] R = [];
+	list[CTup] L = [];
+	list[CTup] R = [];
 	
-	list[real] a = midVector(dim, M);
-	real cut = a[dim];
+	CTup a = midVector(dim, M);
+	real cut = a.V[dim];
 	
-	for(s <- ( M - [a] ), e := s[dim])
+	for( <w, s> <- ( M - a), e := s[dim])
 	{
 		if (e > cut)
-			R += [s];
+			R += <w, s>;
 		else
-			L += [s];
+			L += <w, s>;
 	}
 	
 	int lW = size(L);
@@ -85,18 +96,18 @@ KDT genKDT( Matrix[real] M, KRegion bound, int d = 1 )
 	if(lW == 0 && rW != 0)
 	{
 		KRegion rBound = moveMin(bound, d, cut);
-		return kdtNode(dim, a, bound, genKDT(R, rBound, d = d + 1));
+		return kdtNode(dim, a.w, a.V, bound, genKDT(R, rBound, d = d + 1));
 	}
 	else if(lW != 0 &&  rW == 0)
 	{
 		KRegion lBound = moveMax(bound, d, cut);
-		return kdtNode(dim, a, bound, genKDT(L, lBound, d = d + 1));
+		return kdtNode(dim, a.w, a.V, bound, genKDT(L, lBound, d = d + 1));
 	}
 	else
 	{
 		KRegion lBound = moveMax(bound, d, cut);
 		KRegion rBound = moveMin(bound, d, cut);
-		return kdtNode(dim, a, bound, genKDT(L, lBound,  d = d + 1), genKDT(R, rBound, d = d + 1));
+		return kdtNode(dim, a.w, a.V, bound, genKDT(L, lBound,  d = d + 1), genKDT(R, rBound, d = d + 1));
 	}
 }
 
@@ -110,7 +121,7 @@ num worstNN = 9999999;
 int neighbors = 50;
 /* Priority Queue holding the distances and coordinates of 
    the closest points */
-lrel[num d, list[real] V] neighborPQ = [];
+lrel[real d, real w, list[real] V] neighborPQ = [];
 
 /* Predict 'p' using 'K' and store the results in neighborPQ */
 void predictKDT( KDT K, list[int] p) = predictKDT( K, p, K.B);
@@ -120,33 +131,39 @@ void predictKDT( KDT K, list[int] p, KRegion bound)
 
 	switch( K )
 	{
-		case leaf(list[real] V): return updatePQ(<dist(K.V, p), V>);
-		case kdtNode(int dim, list[real] V, KRegion B, KDT L, KDT R):
+		case leaf(real w, list[real] V): return updatePQ(<w * dist(K.V, p), w, V>);
+		case kdtNode(int dim, real w, list[real] V, KRegion B, KDT L, KDT R):
 		{
 			real cut = V[dim];
 			if( cut >= p[dim] ){
+				updatePQ( < dist(K.V, p), w, K.V> );
 				predictKDT(R, p, B);
 				if(isRegionClose(B, p)) predictKDT(L, p, B);
-				return updatePQ( <dist(K.V, p), K.V> );
 			}
 			else{
+				updatePQ( < dist(K.V, p), w, K.V> );
 				predictKDT(L, p, B);
-				if(isRegionClose(B, p)) predictKDT(R, p, B);
-				
-				return updatePQ( <dist(K.V, p), K.V> );
+				if(isRegionClose(B, p)) predictKDT(R, p, B);				
 			}
 		}
-		case kdtNode(int dim, list[real] V, KRegion B, KDT L): return updatePQ(<dist(K.V, p), K.V>);
+		case kdtNode(int dim, real w, list[real] V, KRegion B, KDT L):{
+			updatePQ(<dist(K.V, p), w, K.V>);
+			predictKDT(L, p, B);
+		}
 	}
 }
 
+
+/* Returns the average value of a dimension in a Matrix */
+CTup midVector( int d, list[CTup] M ) = M[sort([ <e, w, n> | n <- index(M), e:= M<1>[n][d], w := M<0>[n] ])[floor( size(M) / 2 )][2]];
+
 /* Insert a new point in neighborPQ */
-void updatePQ( tuple[num, list[real]] p )
+void updatePQ( tuple[real, real, list[real]] p )
 {
 	int sz = size(neighborPQ);
 	if( sz <= neighbors || p[0] <= worstNN )
 	{
-		neighborPQ += p;
+		neighborPQ += [p];
 		neighborPQ = sort(neighborPQ);
 		sz += 1;
 		if(sz > neighbors) sz = neighbors;
@@ -158,22 +175,21 @@ void updatePQ( tuple[num, list[real]] p )
 
 /* Perform Best Matching Neighbors using 
    the nearest Clusters */
-lrel[num, str, int] predictNN( list[int] p, lrel[num d, list[real] V] M, Key key)
+lrel[num, str, int] predictNN( list[int] p, lrel[real d, real w, list[real] V]  M, Key key)
 {
-	num maxD = max(M<0>);
-
-	list[real] ret = [0.0 | n <- p];
+	real maxD = max(M<0>);
+	real minD = min(M<0>);
 	
-	for( <d, V> <- M )
+	list[real] ret = [0.0 | n <- index(p)];
+	for( <d, w, V> <- M )
 	{
-		for( n <- index(V) )
-		{
-			ret[n] +=  V[n] * (maxD - d);
-		}
+		real distance = (maxD == minD) ? 1.0 : ((maxD - d)/ (maxD - minD));
+
+		for( n <- index(V), e := V[n], e > 0 )
+			ret[n] += e * w *  distance;
 	}
 	
-	num sz = size(M) + sum(M<0>);
-	return reverse(sort([ <e, head(key[{n}]), n> | n <- index(ret), e := (ret[n] / sz), e >= pThres  ]));
+	return reverse(sort([ <e, head(key[{n}]), n> | n <- index(ret), e := ret[n] , e >= pThres ]));
 }
 
 /********************************************************************
@@ -198,7 +214,7 @@ KRegion moveMin(KRegion B, int dim, real cut)
 }
 
 /* Deturmine if the region is close enough to
-   the query point to be eligible to be a NN */
+   the query point to be eligible as a NN */
 bool isRegionClose(KRegion B, list[num] V) 
 {
 	/** Cant turn down a region when the PQ isn't full **/

@@ -28,22 +28,23 @@ def sScore():
 	mSze = 0
 	d = dict([(0,0)])
 
-	skip = 100
+	skip = 500
 	prevS = 0
 	val = 0
 
 	while( skip != 0) :
-		cluster_labels = KMC(val)
+		cluster_labels = KMC(val + skip)
 		silhouette_avg = silhouette_score(X_train, cluster_labels)
 		d[val + skip] = silhouette_avg
-		print "For n_clusters =", val, "The average silhouette_score is :", silhouette_avg
-		skip = int((silhouette_avg - prevS) * skip )
+		print "For n_clusters =", val + skip, "The average silhouette_score is :", silhouette_avg
 	
-		if(silhouette_avg - prevS < 0):
+		if(silhouette_avg - prevS <= 0):
 			skip *= .5
+			skip = int(skip)
 		else:
 			val += skip
-
+		
+		prevS = silhouette_avg
 	return d
 
 def tst():
@@ -53,9 +54,9 @@ def KMC( c ):
 	kM = KMeans(n_clusters=c, random_state=None, n_jobs=-1 )
 	labels = kM.fit_predict(X_train)
 	centers = kM.cluster_centers_
-
+	np.savetxt(dIn.genLoc('KMClabels' + `c`), labels)
 	np.savetxt(dIn.genLoc('KMCarray' + `c`), centers)
-	saveKMC(kM, c)
+	# saveKMC(kM, c)
 	# print kM.score(X_test)
 	return labels
 
@@ -77,4 +78,5 @@ def Agglomerative():
 def readAgglomerative():
 	return joblib.load(dIn.genLoc('AgglModel').replace('.txt', '.sav'))
 
-sScore()
+# sScore()
+k = KMC(1500)
