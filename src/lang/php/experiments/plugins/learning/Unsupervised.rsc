@@ -20,23 +20,6 @@ real pThres = .5;
 alias MatrixReg = tuple[ Matrix[int] fMatrix, RegMap fReg];
 
 /********************************************************************
-							Test Functions
-********************************************************************/
-
-/* Test using clusters generated in python */
-void run(str version)
-{
-	Matrix[real] K = getPy();
-	
-	int sz = size(K[0]);
-	println("FindCluster; Size K: <size(K)>");
-	findNearestCluster(testBinarize([8], sz), K);
-}
-
-/* Read a list of clusters generated in python */
-Matrix[real] getPy() = readPyMatrix(|file:///home/zac/git/wp-plugin-learning/python/array.txt|);
-
-/********************************************************************
 							Build Functions 
 ********************************************************************/
 
@@ -73,6 +56,9 @@ MatrixReg trainWithAllClasses(str version)
 	/* Save M to file */
 	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt", M.fMatrix);
 	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt",  [ <i , e>  | <i,_,e> <- M.fReg ]);
+	
+	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin", M.fMatrix);
+	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin",  [ <i , e>  | <i,_,e> <- M.fReg ]);
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-MatrixReg-<version>.bin", M);
 	return M ;
 }

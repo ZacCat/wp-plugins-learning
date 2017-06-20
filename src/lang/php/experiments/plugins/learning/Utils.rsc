@@ -4,6 +4,7 @@ import lang::php::pp::PrettyPrinter;
 import lang::php::ast::AbstractSyntax;
 import lang::php::experiments::plugins::Plugins;
 import lang::php::experiments::plugins::Summary;
+
 import IO;
 import Map;
 import List;
@@ -65,7 +66,7 @@ list[int] testBinarize ( list[int] val, int sz )
 ********************************************************************/
 
 /* Manhattan Distance */
-real dist( list[num] p, list[num] q )= toReal(sum([ d | i <- index(p),d := abs( p[i] - q[i] )]));
+real dist( list[num] p, list[num] q )= sum([ d | i <- index(p),d := abs( p[i] - q[i] )]) + 0.0;
 
 /********************************************************************
 						Matrix Functions
@@ -103,23 +104,6 @@ num avgVal( int d, Matrix[real] M )
 						Read File Functions
 ********************************************************************/
 
-/* Read a lrel[int, str] from file */
-Key readMap(loc at)
-{
-	/* Should only be one line */
-	str lines = readFileLines(at)[0][1..-1];
-	
-	Key ret = [];
-	
-	while(/^\<<index:[0-9]+>,\"<name:[^\"]+>\"[\>,]*<next:.*$>/ := lines)
-	{
-		ret += < toInt(index), name >;
-		lines = next;
-	}
-	
-	return ret;
-}
-
 /* Read a 2D matrix of reals from file */
 Matrix[real] readPyMatrix( loc at )
 {
@@ -133,12 +117,7 @@ Matrix[real] readPyMatrix( loc at )
 }
 
 /* Read a list of reals from file */
-list[int] readPyList( loc at )
-{
-	list[str] lines = readFileLines(at);
-	
-	return  [ toInt(toReal(s)) | s <- lines];
-}
+list[int] readPyList( loc at ) = [ toInt(toReal(s)) | s <- readFileLines(at)];
 
 /********************************************************************
 				Feature Generation/Look-up Functions
@@ -214,5 +193,4 @@ void printMatrix(Matrix[int] M)
 			if(M[k][n] > 0) println("M[<k>][<n>]: <M[k][n]>");
 	}
 }
-
 
