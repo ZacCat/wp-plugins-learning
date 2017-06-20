@@ -11,7 +11,7 @@ import util::Math;
 /* Prediction threshold */
 real pThres = .0001;
 
-alias Cluster = tuple[ int w, list[int] rep, Matrix[int] contents ];
+alias Cluster = tuple[ num w, list[num] rep, Matrix[num] contents ];
 data ClusterTree = leaf(Cluster C)| cNode(ClusterTree L, ClusterTree R) | cNode(ClusterTree L); 
 
 /********************************************************************
@@ -21,11 +21,12 @@ data ClusterTree = leaf(Cluster C)| cNode(ClusterTree L, ClusterTree R) | cNode(
 tuple[list[Cluster], Matrix[int], Key] readClust(str version)
 
 {
-	Matrix[int] D = binarize( readTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt") );
+	Matrix[int] D = binarize( readBinaryValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin") );
 	
 	list[Cluster] C = unTree(group(D));
 
-	Key k = readMap(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt");
+	//Key k = readMap(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt");
+	Key k = readBinaryValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin");
 		
 	return <C, D, k>;
 }

@@ -5,7 +5,9 @@ import lang::php::util::Config;
 import lang::php::ast::AbstractSyntax;
 import lang::php::experiments::plugins::Summary;
 import lang::php::experiments::plugins::Plugins;
+import lang::php::experiments::plugins::Locations; 
 import lang::php::experiments::plugins::learning::Utils;
+import lang::php::experiments::plugins::learning::ClusterTransactions;
 
 import IO;
 import Set;
@@ -16,8 +18,16 @@ import ValueIO;
 import Relation;
 import ListRelation;
 
-alias Associative = tuple[ lrel[num, list[num]] transactions, list[num] tVector, num totalW, RegMap tReg ];
+import util::Math;
 
+alias Associative = tuple[ Transactions T, list[num] tVector, num totalW, RegMap tReg ];
+alias Transactions = lrel[num, list[num]];
+/********************************************************************
+							Testing functions
+********************************************************************/
+
+//Associative readA(str version) = readBinaryValueFile(baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin");
+Associative readA(str version) = readBinaryValueFile(#Associative, baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin");
 /********************************************************************
 						Build Functions
 ********************************************************************/
@@ -57,18 +67,20 @@ Associative trainWithAllClasses(str version)
 	}
 		
 	/* Save M to file */
-	writeTextValueFile(baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin", M);
+	writeTextValueFile(baseLoc + "/training/Associative/TrainByClass-Labels-<version>.txt",  [ <i , e>  | <i,_,e> <- M.tReg ]);
+	writeTextValueFile(baseLoc + "/training/Associative/TrainByClass-Transactions-<version>.txt", M.T);
+	writeBinaryValueFile(baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin", M);
 
 	return M;
 }
 
 /* Insert all feature relationships shown in the provided PluginSummary */
 Associative insertSampleFeatures(list[NameOrExpr] tNames, PluginSummary psum, Associative M)
-{	
+{
 	list[num] tV = M.tVector;
 	
 	/* lrel [ specificity, index ] */
-	lrel[int, int] tIndex = { e | h <- tNames, e:= getIndexAndSpecificity(h, psum, M.tReg), e<0> >= 0}; 
+	lrel[int, int] tIndex = [ e | h <- tNames, e:= getIndexAndSpecificity(h, psum, M.tReg), e<0> >= 0]; 
 	
 	/* Do not add sample with < 2 hooks */
 	if(size(tIndex) <= 1) return M;
@@ -79,17 +91,35 @@ Associative insertSampleFeatures(list[NameOrExpr] tNames, PluginSummary psum, As
 		if( tV[i] >= 0 ) 
 		{
 			k += 1;
-			tV[i] += s;
+			//tV[i] += s;
 		}
 	}
 
-	num w = sum(tV);
-	num d = w / k;
+	//num w = sum(tV);
+	//num d = w / k;
 	
-	M.transactions += [ <w, tV> ];
-	M.totalW += ( d );
+	/** Not using average specificivity as weight **/
+	M.T += [ <w, 1> ];
+	/** Moving from using totalW **/
+	//M.totalW += ( d );
 		
 	return M;
+}
+
+//alias Cluster = tuple[ int w, list[int] rep, Matrix[int] contents ];
+//data ClusterTree = leaf(Cluster C)| cNode(ClusterTree L, ClusterTree R) | cNode(ClusterTree L); 
+//alias Transactions = lrel[num, list[num]];
+
+Transactions clusterTransactions( Transactions T )
+{
+	println("ClusterTransactions");
+	println("group");
+	ClusterTree CT = group(<0, [], T<1>>);
+	println("unTree");
+	list[Cluster] CL = untree(CT);
+	println("toTransaction");
+	Transactions T = [<w, s> | <w, s, _> <- CL];
+	return T;
 }
 
 /********************************************************************
@@ -97,125 +127,70 @@ Associative insertSampleFeatures(list[NameOrExpr] tNames, PluginSummary psum, As
 ********************************************************************/
 
 /* TODO: Weighted Associative Analysis; Hash Tree */
-list[lrel[list[int], num]] Apriori(Associative M, num minSupport)
+list[Transactions] Apriori(Transactions T, num minSupport)
 {	
-	num minW = M.totalW * minSupport;
+	println("Apriori");
+	real totalW = sum(T<0>);
+	num minW = totalW * minSupport;
+	
+	T = clusterTransactions(T);
 	
 	/* list [ lrel [ indexes : weight ] ]
 	   Frequent item sets */
-	list[lrel[list[int], num]] L = [];
+	list[Transactions] L = [];
 	
 	/* Candidates */
-	lrel[list[int], num] C = [ <[s] , 0> | s <- [0 .. size(M.tReg) - 1] ];
-		
+	Transactions C = [ <0, [s]> | s <- index(T[0][1]) ];
+	
 	int k = 1;
 
 	while( size(C) != 0 )
 	{
 		println(k);
-		L += [ calcValid( M, C, minW) ];
+		L += [ calcValid( T, C, minW) ];
 		println(L);
 		k += 1;
-		C = genAndPrune( L, k );
+		if(size(L) > 0) C = genAndPrune( L, k );
 	}
 	
 	return L;
 }
 
-lrel[list[int], num] calcValid( Associative M, lrel[list[int], num] cVector, num minW) = getValid( calcWeights( M, cVector), minW );
+Transactions calcValid( Transactions M, Transactions C, num minW) = getValid( calcWeights( M, C), minW );
 
-lrel[list[int], num] calcWeights( Associative M, lrel[list[int], num] cVector)
-{
-	println("calcWeights");
-	int k = 0;
-	/* For each weight w and set s */
-	for( < w, s > <- M.transactions )
-	{	
-		if( k % 1000 == 0 ) println("Trans: <k>");
-		int i = 0;
-		/* for each domain d */	
-		for( d <- cVector<0> )
-		{
-			/* False if the set is empty */
-			bool isIn = size(s) > 0;
-			/* for each int n in the domain set */
-			for( n <- d, isIn)
-			{
-				if( s[n] == 0 ) isIn = false;
-			}
-			if( isIn ) cVector[i] = <d, w>;
-			i += 1;
-		}
-		k += 1;
-	}
-	
-	println(cVector);
-	return cVector;
+
+Transactions calcWeights( Transactions M, Transactions cVector){
+	println("calcWeight");	
+	return [<sum([w | < w, s > <- M, s >= d] + [0.0]), d> | d <-cVector<1>];
 }
+
 
 /********************************************************************
 						Subset Functions
 ********************************************************************/
 
 
-lrel[list[int], num] getValid( lrel[list[int], num] cVector, num minW ) = [ <s, w> | <s, w> <- cVector, w >= minW ];
+Transactions getValid( Transactions cVector, num minW )
+{
+	println("getValid");
+	return [ <w, s> | <w, s> <- cVector, w >= minW ];
+}
 
-lrel[list[int], num] genAndPrune( list[lrel[list[int], num]] C, int i ) = prune( genCombos( C, i ), i );
+Transactions genAndPrune( Transactions C, int i ) = prune( genCombos( C, i ), i );
 
-/* Use List multiplication */
-list[lrel[list[int], num]] genCombos( list[lrel[list[int], num]] C, int i )
+Transactions genCombos( Transactions C, int i)
 {
 	println("genCombos");
-
-	Matrix[int] prevL = [ s | <s, _> <- C[i - 2] ];
-
-	int sizeL = size( prevL );
-	if(sizeL == 0 ) return [];
-	
-	Matrix[int] t = [];
-	
-	int sz = size( prevL[0] ) - 1;
-		
-	if(sz == 0)
-	{
-		for( s <- index(prevL) )
-		{
-			for( n <- [ s + 1 .. sizeL - 1 ], n < sizeL)	
-			{
-				// n gives index out of bounds error
-				list[int] f = prevL[s] + prevL[n];
-				t += [f];
-			}
-		}
-	}
-	else
-	{
-		Matrix[int] h = [ e | s <- prevL, e := delete( s, sz ) ];
-		
-		/***** Check logic ****/
-		for( s <- [0 .. sizeL - 2])
-		{
-			for( n <- [ s + 1 .. sizeL - 1 ] )
-			{
-				if (h[i] == h[n]) t += [sort(prevL[i] + tail(prevL[n], 1))];
-				else break;
-				//t += ( e : 0 | n <- [ s .. sizeL - 1 ], e := prevL[s] + prevL[n], size(e) == i );
-			}
-		}
-	}
-	
-	t = dup(t);
-	println(t);
-	return C + [[ <n, 0> | n <- t]];
+	return dup([<0, dup(e)> | t := C<1>, <s, s1> <- t *t, s[0..-1] == s1[0..-1], s != s1, e:= merge(s, s1)]);
 }
 
 /* Removes sets with at least one infrequent superset */
-lrel[list[int], num] prune( list[lrel[list[int], num]] C, int i )
+Transactions prune( Transactions C, int i )
 {
 	println("prune");
 	
-	lrel[set[int], num] L = []; 
-	if( ( size(C) < 2) || (size(C[i - 2]) == 0)) return [];
+	Transactions L = []; 
+	//if( ( size(C) < 2) || (size(C[i - 2]) == 0)) return [];
 	
 	Matrix[int] prevL =  [ s| <s,_>  <- C[i - 2] ];
 	
@@ -226,14 +201,14 @@ lrel[list[int], num] prune( list[lrel[list[int], num]] C, int i )
 		bool isIn = false;
 		for( k <- s )
 		{
-			if( indexOf(prevL, s - k) >= 0 ) isIn = true;
+			if( (s - k) <= prevL ) isIn = true;
 			else 
 			{
 				isIn = false;
 				break;
 			}
 		}
-		if( isIn ) L += [ s , 0 ];
+		if( isIn ) L += [ 0, s ];
 	}
 	
 	return L;
