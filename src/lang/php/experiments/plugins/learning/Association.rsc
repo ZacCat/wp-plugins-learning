@@ -20,197 +20,67 @@ import ListRelation;
 
 import util::Math;
 
-alias Associative = tuple[ Transactions T, list[num] tVector, num totalW, RegMap tReg ];
-alias Transactions = lrel[num, list[num]];
+alias AprioriMap = map[list[int], int];
+
 /********************************************************************
 							Testing functions
 ********************************************************************/
 
-//Associative readA(str version) = readBinaryValueFile(baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin");
-Associative readA(str version) = readBinaryValueFile(#Associative, baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin");
-/********************************************************************
-						Build Functions
-********************************************************************/
-
-/* Populate an empty Associative */
-Associative initMatrix(str version)
+tuple[Cluster[int], Key] readTrans(int w, str version)
 {
-	PluginSummary wpsum = loadWordpressPluginSummary(version);
+	Matrix[int] M = readTextValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt");
+	Cluster[int] C = unBinarizedBuildCluster(M, w);
 	
-	RegMap tReg = labelRegMap(wpsum);
+	Key k = readTextValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt");
 		
-	return <[], [ 0.0 | _ <- [0 .. size(tReg)] ], 0.0, tReg>;
+	return <C, k>;
 }
 
-/* Create a new Associative populated with information generated 
-   from all plugins compatible with the given WordPress version,
-   relations determined by classes */
-Associative trainWithAllClasses(str version)
-{
-	Associative M = initMatrix(version);
-
-    pluginDirs = sort([l | l <- pluginDir.ls, isDirectory(l) ]);
-
-    for (l <- pluginDirs, exists(getPluginBinLoc(l.file)), exists(infoBin+"<l.file>-hook-uses.bin")) {
- 		
-    	PluginSummary psum = loadPluginSummary(l.file);
- 
-    	if (psum.pInfo is pluginInfo && just(maxVersion) := psum.pInfo.testedUpTo && maxVersion == version ) 
-		{		
-			println("Training with: <l.file>");
-			for(<_, at,_> <- psum.classes )
-			{
-				list[NameOrExpr] tNames = featureList(psum, at);	
-				M = insertSampleFeatures(tNames, psum, M);
-			}
-		}
-	}
-		
-	/* Save M to file */
-	writeTextValueFile(baseLoc + "/training/Associative/TrainByClass-Labels-<version>.txt",  [ <i , e>  | <i,_,e> <- M.tReg ]);
-	writeTextValueFile(baseLoc + "/training/Associative/TrainByClass-Transactions-<version>.txt", M.T);
-	writeBinaryValueFile(baseLoc + "/training/Associative/TrainByClass-Association-<version>.bin", M);
-
-	return M;
-}
-
-/* Insert all feature relationships shown in the provided PluginSummary */
-Associative insertSampleFeatures(list[NameOrExpr] tNames, PluginSummary psum, Associative M)
-{
-	list[num] tV = M.tVector;
-	
-	/* lrel [ specificity, index ] */
-	lrel[int, int] tIndex = [ e | h <- tNames, e:= getIndexAndSpecificity(h, psum, M.tReg), e<0> >= 0]; 
-	
-	/* Do not add sample with < 2 hooks */
-	if(size(tIndex) <= 1) return M;
-
-	int k = 0;
-	for( < i, s > <- tIndex )
-	{
-		if( tV[i] >= 0 ) 
-		{
-			k += 1;
-			//tV[i] += s;
-		}
-	}
-
-	//num w = sum(tV);
-	//num d = w / k;
-	
-	/** Not using average specificivity as weight **/
-	M.T += [ <w, 1> ];
-	/** Moving from using totalW **/
-	//M.totalW += ( d );
-		
-	return M;
-}
-
-//alias Cluster = tuple[ int w, list[int] rep, Matrix[int] contents ];
-//data ClusterTree = leaf(Cluster C)| cNode(ClusterTree L, ClusterTree R) | cNode(ClusterTree L); 
-//alias Transactions = lrel[num, list[num]];
-
-Transactions clusterTransactions( Transactions T )
-{
-	println("ClusterTransactions");
-	println("group");
-	ClusterTree CT = group(<0, [], T<1>>);
-	println("unTree");
-	list[Cluster] CL = untree(CT);
-	println("toTransaction");
-	Transactions T = [<w, s> | <w, s, _> <- CL];
-	return T;
-}
+list[AprioriMap] genApriori(tuple[Cluster[int], Key] A, real sup) = Apriori(A[0], sup);
 
 /********************************************************************
 						Prediction Functions
 ********************************************************************/
 
 /* TODO: Weighted Associative Analysis; Hash Tree */
-list[Transactions] Apriori(Transactions T, num minSupport)
-{	
-	println("Apriori");
-	real totalW = sum(T<0>);
-	num minW = totalW * minSupport;
-	
-	T = clusterTransactions(T);
-	
-	/* list [ lrel [ indexes : weight ] ]
-	   Frequent item sets */
-	list[Transactions] L = [];
-	
+list[AprioriMap] Apriori(Cluster[int] T, real minSupport)
+{
+	real minW = sum(T<1>) * minSupport + 0.0;
+
 	/* Candidates */
-	Transactions C = [ <0, [s]> | s <- index(T[0][1]) ];
-	
-	int k = 1;
+	AprioriMap C = ( [s] : 0 | s <- {i | <s, _> <- T, i <- s});	
+	C = calcWeights(C, T);
+	C = getValid(C, minW);
+
+	/* list [ lrel [ indexes, weight ] ]
+	   Frequent item sets */
+	list[AprioriMap] L = [];
 
 	while( size(C) != 0 )
 	{
-		println(k);
-		L += [ calcValid( T, C, minW) ];
-		println(L);
-		k += 1;
-		if(size(L) > 0) C = genAndPrune( L, k );
+		L += [ C ];
+
+		C = genCombos(L[-1]<0>);	
+		C = calcWeights(C, T);
+		C = getValid(C, minW);
 	}
-	
+
 	return L;
 }
-
-Transactions calcValid( Transactions M, Transactions C, num minW) = getValid( calcWeights( M, C), minW );
-
-
-Transactions calcWeights( Transactions M, Transactions cVector){
-	println("calcWeight");	
-	return [<sum([w | < w, s > <- M, s >= d] + [0.0]), d> | d <-cVector<1>];
-}
-
 
 /********************************************************************
 						Subset Functions
 ********************************************************************/
 
-
-Transactions getValid( Transactions cVector, num minW )
+AprioriMap calcWeights( AprioriMap C, Cluster[int] T)
 {
-	println("getValid");
-	return [ <w, s> | <w, s> <- cVector, w >= minW ];
+	for( <s, w> <- T,  n <- C,  n <= s)
+			C[n] += w;
+	
+	return C;
 }
 
-Transactions genAndPrune( Transactions C, int i ) = prune( genCombos( C, i ), i );
+AprioriMap getValid( AprioriMap T, real minW ) = ( n : w | n <- T, w := T[n], w >= minW );
 
-Transactions genCombos( Transactions C, int i)
-{
-	println("genCombos");
-	return dup([<0, dup(e)> | t := C<1>, <s, s1> <- t *t, s[0..-1] == s1[0..-1], s != s1, e:= merge(s, s1)]);
-}
-
-/* Removes sets with at least one infrequent superset */
-Transactions prune( Transactions C, int i )
-{
-	println("prune");
-	
-	Transactions L = []; 
-	//if( ( size(C) < 2) || (size(C[i - 2]) == 0)) return [];
-	
-	Matrix[int] prevL =  [ s| <s,_>  <- C[i - 2] ];
-	
-	set[list[int]] setL = toSet(prevL);
-	
-	for( s <- prevL )
-	{
-		bool isIn = false;
-		for( k <- s )
-		{
-			if( (s - k) <= prevL ) isIn = true;
-			else 
-			{
-				isIn = false;
-				break;
-			}
-		}
-		if( isIn ) L += [ 0, s ];
-	}
-	
-	return L;
-}
+AprioriMap genCombos( set[list[int]] C) = (dup(e) : 0 | <s, s1> <- C * C, s[0..-1] == s1[0..-1], s != s1, e:= merge(s, s1));
 

@@ -13,6 +13,10 @@ import Relation;
 
 import util::Math;
 
+/********************************************************************
+								Aliases
+********************************************************************/
+
 alias RegMap = lrel[int index, NameModel model, str regexp];
 alias HookModels = rel[NameOrExpr hookName, loc at, NameModel model];
 
@@ -21,16 +25,19 @@ alias Matrix[&T] = list[list[&T]];
 /* lrel [ index, feature string ] */
 alias Key = lrel[ int, str ];
 
+alias Cluster[&T <: num] = lrel[list[int], &E];
+
 /********************************************************************
  						Binarization Functions
 ********************************************************************/
 
-/* Binarize a matrix of integers */
-Matrix[int] binarize( Matrix[int] M )
+/* Binarize a matrix */
+Matrix[&T] binarize( Matrix[&T] M) = binarizeAndKey(M)[0];
+tuple[Matrix[&T], map[&T, int]] binarizeAndKey( Matrix[&T] M )
 {
-	list[int] S = sort(dup([ i | s <- M, i <- s ]));
+	list[&T] S = sort(dup([ i | s <- M, i <- s ]));
 	
-	map[ int, int ] K = ( i : n | n <- index( S ), i := S[n] );
+	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
 	
 	Matrix[int] B = [];
 	list[int] bVector = [ 0 | n <- index( S ) ];
@@ -42,39 +49,33 @@ Matrix[int] binarize( Matrix[int] M )
 		B += [tVector];
 	}
 
-	return B;
+	return <B, K>;
 }
 
 /* Create a vector of size 'size' with values in indexes
    'val' represented with a 1 */
-list[int] testBinarize ( list[int] val, int sz )
-{
-	int i = 0;
-	list[int] B = [];
-	for( n <- [0.. sz] )
-	{
-		if( i in val ) B += 1;
-		else B += 0;
-		i += 1;
-	}
-	
-	return B;
-}
+list[int] testBinarize ( list[int] val, int sz ) = [ i in val ? 1 : 0 | i <- [0 .. sz]] ;
 
 /********************************************************************
 							Mathematic Functions
 ********************************************************************/
 
 /* Manhattan Distance */
-real dist( list[num] p, list[num] q )= sum([ d | i <- index(p),d := abs( p[i] - q[i] )]) + 0.0;
+real dist( list[&T <: num] p, list[&T <: num] q )= sum([ d | i <- index(p),d := abs( p[i] - q[i] )]) + 0.0;
 
+/* Similarity Score */
+real sim( real maxD, real minD, real d, real w, real v) = ((maxD == minD) ? 1.0 : ((maxD - d)/ (maxD - minD))) * v * w;
 /********************************************************************
 						Matrix Functions
 ********************************************************************/
 
+/* Returns the aggragete weight of
+   each duplicate value M */
+lrel[list[&T], &E <: num] weightedDistribution(lrel[list[&T], &E <: num] M) = [ <s, sum(M[s])> | s <- dup(M<0>)];
+
 /* Return the max value in 'M'
    Unused */
-int maxM( Matrix[int] M )
+&T <: num maxM( Matrix[&T <: num] M )
 {
 	int m = 0;
 	for ( s <- M, i <- s, i > m ) m = i;
@@ -83,22 +84,13 @@ int maxM( Matrix[int] M )
 
 /* Return the average size in a 'M'
    Unused */
-num cAverage( Matrix[int] M )
+&T <: num cAverage( Matrix[&T <: num] M )
 {
 	num m = 0;
 	for ( s <- M, e := size(s) ) m += e;
 	return m;
 }
 
-/* Returns the average value of a dimension in a Matrix
-   Unused */
-num avgVal( int d, Matrix[real] M )
-{
-	num a = 0;
-	for( n <- M, e:= n[d] ) a += e;
-
-	return (a / size(M));
-}
 
 /********************************************************************
 						Read File Functions
@@ -117,7 +109,7 @@ Matrix[real] readPyMatrix( loc at )
 }
 
 /* Read a list of reals from file */
-list[int] readPyList( loc at ) = [ toInt(toReal(s)) | s <- readFileLines(at)];
+list[real] readPyList( loc at ) = [ toReal(s) | s <- readFileLines(at)];
 
 /********************************************************************
 				Feature Generation/Look-up Functions
@@ -182,8 +174,9 @@ str getIndexListString(int k, RegMap regexps){ for ( <i, _, n> <- regexps, i == 
 						Visualization Functions
 ********************************************************************/
 
-/* Print all nonzero matrix items and their index */
-void printMatrix(Matrix[int] M)
+/* Print all nonzero matrix items and their index
+	Unused */
+void printMatrix(Matrix[&T] M)
 {
 	println("Matrix:");
 	
@@ -192,5 +185,21 @@ void printMatrix(Matrix[int] M)
 		for( n <- [0 .. size(M[k]) - 1] )
 			if(M[k][n] > 0) println("M[<k>][<n>]: <M[k][n]>");
 	}
+}
+
+/********************************************************************
+							Key Functions
+********************************************************************/
+
+/* Return the indexes of a list of strings in k
+   Unused */
+list[int] findKeyIndex( list[str] s, Key k) 
+{
+	list[int] ret = [];
+	for( <_, i, st> <- k, st in s)
+	{
+		ret += i;
+	}
+	return ret;
 }
 

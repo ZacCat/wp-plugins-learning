@@ -5,138 +5,103 @@ import lang::php::experiments::plugins::learning::Utils;
 
 import IO;
 import List;
+import Map;
+import Type;
 import ValueIO;
+import ListRelation;
 import util::Math;
 
 /* Prediction threshold */
-real pThres = .0001;
-
-alias Cluster = tuple[ num w, list[num] rep, Matrix[num] contents ];
-data ClusterTree = leaf(Cluster C)| cNode(ClusterTree L, ClusterTree R) | cNode(ClusterTree L); 
+real pThres = .1;
 
 /********************************************************************
 							Test Functions 
 ********************************************************************/
 
-tuple[list[Cluster], Matrix[int], Key] readClust(str version)
+tuple[Cluster[&T <: num], int, Key] readClust(&T <: num w, str version)
 
 {
-	Matrix[int] D = binarize( readBinaryValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin") );
+	Matrix[int] M = readTextValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt");
+	Cluster[&T] C = buildCluster(M, w);
 	
-	list[Cluster] C = unTree(group(D));
-
-	//Key k = readMap(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt");
-	Key k = readBinaryValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin");
+	Key k = readTextValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt");
 		
-	return <C, D, k>;
+	return <C, size(C<0>[0]), k>;
 }
 
-lrel[num,str, int] tst(tuple[list[Cluster], Matrix[int], Key] A, list[int] p) = BMN(testBinarize(p, size(A[1][0])), A[0], A[2]);
+lrel[num,str, int] tst(tuple[Cluster[&T <: num], int, Key] A, list[int] p) = BMN(testBinarize(p, A[1]), A[0], A[2]);
 
 /********************************************************************
 							Build Functions 
 ********************************************************************/
 
-/* Return the indexes of a list of strings in k */
-list[int] findKeyIndex( list[str] s, Key k) 
-{
-	list[int] ret = [];
-	for( <_, i, st> <- k, st in s)
-	{
-		ret += i;
-	}
-	return ret;
-}
+/* Build cluster from an unbinarized matrix with uniform weight */
+Cluster[&T] buildCluster( Matrix[&E] M, &T <: num w ) = weightedDistribution([ <s ,w> | s <- binarize(M)]);
 
-/* Retreive a list of Clusters from a Cluster Tree */
-list[Cluster] unTree( ClusterTree T )
-{
-	list[Cluster] lst = [];
-	visit(T) { case leaf(Cluster C): lst += C;}
-	lst = [ <a, b, c> |< a, b, c > <- lst, a > 2 ];
-	return lst;
-}
-
-/* Group a matrix and find each groups weight */
-ClusterTree group ( Matrix[int] M ) = group(<0, [], M>);
-ClusterTree group( Cluster C )
-{
-	if (size( C.contents) == 0) return leaf(C);
-	
-	Cluster cZero =  < 0, C.rep + 0, [] >;
-	Cluster cOne = < 0,  C.rep + 1, [] >;
-	
-	for( s <- C.contents, e := headTail( s ))
-	{
-		if ( e[0] == 0 )
-		{
-			if(size( e[1] ) != 0) cZero.contents += [e[1]];
-			cZero.w += 1;
-		}
-		else
-		{
-			if(size( e[1] ) != 0)cOne.contents += [e[1]];
-			cOne.w += 1;	
-		}
-	}
-	
-	if(cZero.w == 0 && cOne.w != 0) return cNode(group(cOne));
-	else if(cZero.w != 0 &&  cOne.w == 0) return cNode(group(cZero));
-	else return cNode(group(cZero), group(cOne));
-}
+Cluster[&T] unBinarizedBuildCluster( Matrix[&E] M, &T <: num w ) = weightedDistribution([ <sort(dup(s)) ,w> | s <- M]);
 
 /********************************************************************
-						Prediction Functions 
+						Standard BMN Functions 
 ********************************************************************/
 
 /* Best Matching Neighbors */
-lrel[num, str, int] BMN( list[int] i, list[Cluster] C, Key key )
+lrel[real, str, int] BMN( list[int] q, Cluster[&T <: num] C, Key key )
 {
-	list[num] p = [];
-	int sz = 0;
+	list[real] p = [];
+	real sumW = 0.0;
 	
-	int j = 0;
-	for( <w, s, _>  <- C )
+	for( <s, w>  <- C )
 	{
 		bool match = true;
-		for( n <- index( i ), match, i[n] > 0, s[n] != i[n])
+		for( n <- index( q ), match, q[n] != 0, s[n] != q[n])	
 			match = false;
 
+
 		if( match )
-		{
-			p = size(p) == 0 ? [ n * w | n <- s ] : [ f | k <- index( s ), f:= p[k] + (w * s[k]) ];
-			sz += w;
-		}
+			p = isEmpty(p) ? [ v * w + 0.0 | v <- s ] : [ f | k <- index( s ), f:= p[k] + (w * s[k]) ];
 	}
-			
-	return reverse(sort([ <e, head(key[{n}]), n> | n <- index(p), e := (p[n] / sz), e >= pThres  ]));
+	real sumW = sum(C<1>);
+	
+	return sort([ <e, head(key[{n}]), n> | n <- index(p), e := (p[n] / sumW) + 0.0, e >= pThres], bool(&T a, &T b){ return a > b;});
 }
 
 /********************************************************************
-					Unimplemented Functions 
+					Distance Weighted BMN Functions 
 ********************************************************************/
 
-/* TODO: Improve implementation
-   Currently Unused
-   Try BMN-esque algorithm with a match tollerance */ 
-list[Cluster] absorbNoise( list[Cluster] C )
+/* Perdict Best Matching Neighbors using the nearest
+   neighbors containing the query pattern
+   May need to add kD-tree if too slow */
+lrel[real, str, int] DistWeightedBMN( list[int] q, Cluster[&T <: num] C, Key key )
 {
-	int t = 0;
-	list[Cluster] ret = [];
-	for(i <- index(C), n <- index(C) - i, c1 := C[i],c2 := C[n])
+	lrel[ real, num, list[int]] NN = [];
+	
+	for( <s, w>  <- C)
 	{
-		t += 1;
-		if( t % 1000 == 0) println(t);
-		
-		// dist 2 == two different features
-		if( c1.w > c2.w * 2 && dist(c1.rep, c2.rep) <= 2 )
-		{
-			println("Absorbed");
-			ret += < c1.w + c2.w, c1.rep, dup(c1.contents + c2.contents + c2.rep) >;
-			break;
-		}
+		bool match = true;
+		for( n <- index( q ), match, q[n] != 0, s[n] != q[n])
+			match = false;
+
+		if( match )
+			NN += <dist(q, s), w, s>;
 	}
-	return ret;
+		
+	return predictNN(NN, key);
 }
 
+/* Predict the probability of each feature */
+lrel[real, str, int] predictNN( lrel[real d, num w, list[int] V]  M, Key key)
+{
+	real maxD = max(M<0>);
+	real minD = min(M<0>);
+	
+	list[real] ret = [0.0 | n <- index(M[0]<2>)];
+	for( <d, w, V> <- M )
+	{
+		for( n <- index(V), e := V[n], e > 0 )
+			ret[n] += sim(maxD, minD, d, w, e);
+	}
+	num sz = sum(M<1>);
+	return sort([ <e + 0.0, head(key[{n}]), n> | n <- index(ret), e := ret[n] / sz , e >= pThres ], bool(tuple[real,str,int] a, tuple[real,str,int]  b){ return a<0> > b<0>;});
+}
 
