@@ -22,8 +22,8 @@ alias HookModels = rel[NameOrExpr hookName, loc at, NameModel model];
 
 alias Matrix[&T] = list[list[&T]];
 
-/* lrel [ index, feature string ] */
-alias Key = lrel[ int, str ];
+/* map [ index, feature string ] */
+alias Key = map[ int, str ];
 
 alias Cluster[&T <: num] = lrel[list[int], &E];
 
@@ -32,13 +32,13 @@ alias Cluster[&T <: num] = lrel[list[int], &E];
 ********************************************************************/
 
 /* Binarize a matrix */
-Matrix[&T] binarize( Matrix[&T] M) = binarizeAndKey(M)[0];
-tuple[Matrix[&T], map[&T, int]] binarizeAndKey( Matrix[&T] M )
+Matrix[&T] binarize( Matrix[&T] M)
 {
 	list[&T] S = sort(dup([ i | s <- M, i <- s ]));
 	
+	/* map [ old value, new index  ] */
 	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
-	
+		
 	Matrix[int] B = [];
 	list[int] bVector = [ 0 | n <- index( S ) ];
 	
@@ -56,6 +56,29 @@ tuple[Matrix[&T], map[&T, int]] binarizeAndKey( Matrix[&T] M )
    'val' represented with a 1 */
 list[int] testBinarize ( list[int] val, int sz ) = [ i in val ? 1 : 0 | i <- [0 .. sz]] ;
 
+Matrix[&T] reIndexMatrix( Matrix[&T] M )
+{
+	list[&T] S = sort(dup([ i | s <- M, i <- s ]));
+	
+	/* map [ old value, new index  ] */
+	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
+		
+	Matrix[&T] ret = [[K[n] | n <- s ] | s <- M];
+	
+	return ret;
+}
+
+Key reIndexKey( Matrix[&T] M, map[&T, str] key )
+{
+	list[&T] S = sort(dup([ i | s <- M, i <- s ]));
+	
+	/* map [ old value, new index  ] */
+	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
+		
+	return ( K[old] : key[old] | old <- K );
+}
+
+
 /********************************************************************
 							Mathematic Functions
 ********************************************************************/
@@ -65,6 +88,7 @@ real dist( list[&T <: num] p, list[&T <: num] q )= sum([ d | i <- index(p),d := 
 
 /* Similarity Score */
 real sim( real maxD, real minD, real d, real w, real v) = ((maxD == minD) ? 1.0 : ((maxD - d)/ (maxD - minD))) * v * w;
+
 /********************************************************************
 						Matrix Functions
 ********************************************************************/
@@ -169,37 +193,4 @@ int getStringIndex(str k, RegMap regexps){ for ( <i, _, n> <- regexps, n == k) r
 /* Return the string value represented index k
    Unused */
 str getIndexListString(int k, RegMap regexps){ for ( <i, _, n> <- regexps, i == k) return n; }
-
-/********************************************************************
-						Visualization Functions
-********************************************************************/
-
-/* Print all nonzero matrix items and their index
-	Unused */
-void printMatrix(Matrix[&T] M)
-{
-	println("Matrix:");
-	
-	for( k <- [0 .. size(M) - 1])
-	{
-		for( n <- [0 .. size(M[k]) - 1] )
-			if(M[k][n] > 0) println("M[<k>][<n>]: <M[k][n]>");
-	}
-}
-
-/********************************************************************
-							Key Functions
-********************************************************************/
-
-/* Return the indexes of a list of strings in k
-   Unused */
-list[int] findKeyIndex( list[str] s, Key k) 
-{
-	list[int] ret = [];
-	for( <_, i, st> <- k, st in s)
-	{
-		ret += i;
-	}
-	return ret;
-}
 

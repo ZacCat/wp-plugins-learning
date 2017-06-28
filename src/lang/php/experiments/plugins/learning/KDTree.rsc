@@ -28,16 +28,16 @@ data KDT = leaf( real w, list[real] V)
 KDT readClusterKDT() = genKDT(readPyList(baseLoc + "/training/Unsupervised/TrainByClass-KMClabels1500-4.3.txt"), readPyMatrix(baseLoc + "/training/Unsupervised/TrainByClass-KMCarray1500-4.3.txt"));
 KDT readFeatureKDT(real weight) = genKDT([ <weight, [i + 0.0 | i <- s]> | s <- binarize(readTextValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-4.3.txt"))]);
 
-lrel[num, str, int] tst(KDT K, list[int] p)
+lrel[num, str, int] tst(tuple[KDT, Key] K, list[int] p)
 {
-	int sz = size(K.B[0]);
+	int sz = size(K[0].B[0]);
 	list[int] t = testBinarize(p, sz);
 
 	Key key = readTextValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-4.3.txt");
 
-	kNN( K, t );
+	kNN( K[0], t );
 	println(size(neighborPQ));
-	return predictNN( neighborPQ, key);
+	return predictNN( neighborPQ, K[1]);
 }
 
 /********************************************************************
@@ -163,7 +163,7 @@ lrel[num, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key)
 			ret[n] += sim(maxD, minD, d, w, e);
 	}
 	num sz = size(M);
-	return sort([ <e, head(key[{n}]), n> | n <- index(ret), e := ret[n] / sz , e >= pThres ], bool(tuple[real,str,int] a, tuple[real,str,int]  b){ return a<0> > b<0>;});
+	return sort([ <e, key[n], n> | n <- index(ret), e := ret[n] / sz , e >= pThres ], bool(tuple[real,str,int] a, tuple[real,str,int]  b){ return a<0> > b<0>;});
 }
 
 /********************************************************************

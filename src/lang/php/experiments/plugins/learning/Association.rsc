@@ -20,6 +20,8 @@ import ListRelation;
 
 import util::Math;
 
+real minSup = .01;
+
 alias AprioriMap = map[list[int], int];
 
 /********************************************************************
@@ -28,24 +30,27 @@ alias AprioriMap = map[list[int], int];
 
 tuple[Cluster[int], Key] readTrans(int w, str version)
 {
-	Matrix[int] M = readTextValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt");
+	Matrix[int] M = readBinaryValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin");
+	Key k = readBinaryValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin");
+	
 	Cluster[int] C = unBinarizedBuildCluster(M, w);
 	
-	Key k = readTextValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt");
-		
+	
 	return <C, k>;
 }
 
-list[AprioriMap] genApriori(tuple[Cluster[int], Key] A, real sup) = Apriori(A[0], sup);
+tuple[list[AprioriMap], Key] genApriori(tuple[Cluster[int], Key] A, real sup) = <Apriori(A[0]), A[1]>;
+
+lrel[real, list[str], list[int]] tstApriori(tuple[list[AprioriMap], Key] A, list[int] q, int minSup) = predict(A[0], q, A[1]);
 
 /********************************************************************
 						Prediction Functions
 ********************************************************************/
 
-/* TODO: Weighted Associative Analysis; Hash Tree */
-list[AprioriMap] Apriori(Cluster[int] T, real minSupport)
+/* TODO: Hash Tree */
+list[AprioriMap] Apriori(Cluster[int] T)
 {
-	real minW = sum(T<1>) * minSupport + 0.0;
+	real minW = sum(T<1>) * minSup + 0.0;
 
 	/* Candidates */
 	AprioriMap C = ( [s] : 0 | s <- {i | <s, _> <- T, i <- s});	
@@ -66,6 +71,22 @@ list[AprioriMap] Apriori(Cluster[int] T, real minSupport)
 	}
 
 	return L;
+}
+
+lrel[real, list[str], list[int]] predict(list[AprioriMap] M, list[int] q, Key key)
+{
+	lrel[list[int], real] p = [];
+	int i = size(q);
+	
+	/* q isn't frequent */
+	if( q notin M[i - 1] ) return [];
+	
+	real qS = M[i - 1][q] + 0.0;
+	
+	for( k <- [0.. size(M) - i ], n <- M[k],  j := i + k, e:= merge(n, q), e in M[j], v := M[j][e], v >= minSup )
+		p += <e, v / qS>;
+
+	return head(sort([ <e + 0.0, [key[f] | f <- n], n> | <n, e> <- p ], bool(tuple[real, list[str], list[int]] a, tuple[real, list[str], list[int]]  b){ return a<0> > b<0>;}), 10);
 }
 
 /********************************************************************

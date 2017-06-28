@@ -14,9 +14,6 @@ import List;
 import ValueIO;
 import ListRelation;
 
-/* Prediction threshold */
-real pThres = .5;
-
 alias MatrixReg = tuple[ Matrix[int] fMatrix, RegMap fReg];
 
 /********************************************************************
@@ -51,14 +48,15 @@ MatrixReg trainWithAllClasses(str version)
 		}
 	}
 	
-	M = reduceDimensionality(M);
-	
+	Key key = reIndexKey( M.fMatrix, ( i : e   | <i,_,e> <- M.fReg ));
+	M.fMatrix = reIndexMatrix(M.fMatrix);
+		
 	/* Save M to file */
 	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt", M.fMatrix);
-	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt",  [ <i , e>  | <i,_,e> <- M.fReg ]);
+	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt", key);
 	
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin", M.fMatrix);
-	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin",  [ <i , e>  | <i,_,e> <- M.fReg ]);
+	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin", key);
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-MatrixReg-<version>.bin", M);
 	return M ;
 }
@@ -75,45 +73,4 @@ MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, Matr
 	M.fMatrix += [fIndex];
 	
 	return M;
-}
-
-/********************************************************************
-					Unimplemented Functions
-********************************************************************/
-
-/* TODO: Implement real dimensionality reduction
-         algorithm.
-   Currently: Doesn't remove much; used to re-index
-              fReg.  */
-MatrixReg reduceDimensionality( MatrixReg M )
-{
-	/* ( plugin index : < # of classes with plugin, # of total plugins in each of the classes > )*/ 
-	map[ int, tuple[ int, int ] ] usage = ( i : < 0, 0> | < i, _,_ > <- M.fReg );
-	
-	for( r <- M.fMatrix, k <- r, e := usage[k], s := sum(r) ) usage[k] = < e<0> + 1, e<1> + s >;
-
-	for ( i <- usage, t := usage[i],  t<0> == t<1> )
-	{
-		for( k <- index(M.fMatrix) ,i in M.fMatrix[k])
-		{
-			M.fMatrix[k] -= i;
-			print("Removed");
-		}
-
-		lrel[NameModel, str] j = M.fReg[{i}];
-		for( <n, s>  <- j) M.fReg = M.fReg - <i, n, s>;
-		
-	}
-	
-	RegMap newReg = [];
-		
-	int i = 0;
-	for( < _, n, s> <- M.fReg)
-	{
-		newReg += <i, n, s>;
-		i += 1;
-	}
-	
-	M.fReg = newReg;
-	return  M;
 }
