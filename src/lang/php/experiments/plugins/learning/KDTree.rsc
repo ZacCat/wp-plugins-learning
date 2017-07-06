@@ -28,7 +28,7 @@ data KDT = leaf( real w, list[real] V)
 KDT readClusterKDT() = genKDT(readPyList(baseLoc + "/training/Unsupervised/TrainByClass-KMClabels1500-4.3.txt"), readPyMatrix(baseLoc + "/training/Unsupervised/TrainByClass-KMCarray1500-4.3.txt"));
 KDT readFeatureKDT(real weight) = genKDT([ <weight, [i + 0.0 | i <- s]> | s <- binarize(readTextValueFile(#Matrix[int], baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-4.3.txt"))]);
 
-lrel[num, str, int] tst(tuple[KDT, Key] K, list[int] p)
+lrel[real, str, int] tst(tuple[KDT, Key] K, list[int] p)
 {
 	int sz = size(K[0].B[0]);
 	list[int] t = testBinarize(p, sz);
@@ -44,7 +44,7 @@ lrel[num, str, int] tst(tuple[KDT, Key] K, list[int] p)
 							Build Functions 
 ********************************************************************/
 
-/* Generate a region that encompases all points */
+/* Generate a region that encompases all points in M */
 KRegion startKRegion( Matrix[real] M )
 {
 	KRegion B =  < M[0], M[0]>;
@@ -95,7 +95,7 @@ KDT genKDT( lrel[real w, list[real] V] M, KRegion bound, int d = 1 )
 ********************************************************************/
 
 /* Arbitrarily high number */
-num worstNN = 9999999;
+real worstNN = 9999999.0;
 /* Maximimum nearest neighbors to calculate, may be less */
 int neighbors = 50;
 /* Priority Queue holding the distances and coordinates of 
@@ -148,10 +148,16 @@ void updatePQ( tuple[real, real, list[real]] p )
 	}
 }
 
+lrel[real, str, int] predictKNN(KDT K, list[int] q, Key key, int sz)
+{
+	kNN(K, testBinarize(q, sz));
+	return predictNN(neighborPQ, key);
+}
+
 /* Perform Best Matching Neighbors using the nearest 
    Clusters/Transactions without narrowing by query 
    pattern*/
-lrel[num, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key)
+lrel[real, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key)
 {
 	real maxD = max(M<0>);
 	real minD = min(M<0>);
@@ -162,7 +168,7 @@ lrel[num, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key)
 		for( n <- index(V), e := V[n], e > 0 )
 			ret[n] += sim(maxD, minD, d, w, e);
 	}
-	num sz = size(M);
+	real sz = size(M) + 0.0;
 	return sort([ <e, key[n], n> | n <- index(ret), e := ret[n] / sz , e >= pThres ], bool(tuple[real,str,int] a, tuple[real,str,int]  b){ return a<0> > b<0>;});
 }
 
@@ -178,7 +184,6 @@ tuple[real, list[real]] midVector( int d, lrel[real, list[real]] M ) = M[sort([ 
 KRegion moveMax(KRegion B, int dim, real cut)
 {
 	B.max[dim] = cut;
-	
 	return B;
 }
 
@@ -192,12 +197,12 @@ KRegion moveMin(KRegion B, int dim, real cut)
 
 /* Deturmine if the region is close enough to
    the query point to be eligible as a NN */
-bool isRegionClose(KRegion B, list[num] V) 
+bool isRegionClose(KRegion B, list[int] V) 
 {
-	/** Cant turn down a region when the PQ isn't full **/
+	/* Cant turn down a region when the PQ isn't full */
 	if(size(neighborPQ) < neighbors) return true;
 	
-	num d = 0.0;
+	real d = 0.0;
 	for(i <- index(V), min := B.min[i], max := B.max[i], c := V[i]) 
 	{
 		if( min > c)

@@ -13,6 +13,9 @@ import Relation;
 
 import util::Math;
 
+/* Number of predictions to compare */
+public int hVal = 10;
+
 /********************************************************************
 								Aliases
 ********************************************************************/
@@ -49,7 +52,7 @@ Matrix[&T] binarize( Matrix[&T] M)
 		B += [tVector];
 	}
 
-	return <B, K>;
+	return B;
 }
 
 /* Create a vector of size 'size' with values in indexes
@@ -74,10 +77,11 @@ Key reIndexKey( Matrix[&T] M, map[&T, str] key )
 	
 	/* map [ old value, new index  ] */
 	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
-		
+
 	return ( K[old] : key[old] | old <- K );
 }
 
+list[int] unBinarize(list[int] V) = [i | i <- index(V), V[i] == 1];
 
 /********************************************************************
 							Mathematic Functions
@@ -88,6 +92,8 @@ real dist( list[&T <: num] p, list[&T <: num] q )= sum([ d | i <- index(p),d := 
 
 /* Similarity Score */
 real sim( real maxD, real minD, real d, real w, real v) = ((maxD == minD) ? 1.0 : ((maxD - d)/ (maxD - minD))) * v * w;
+
+real listAvg( list[&T <: num] lst ) = sum(lst) / size(lst) + 0.0;
 
 /********************************************************************
 						Matrix Functions
@@ -114,7 +120,6 @@ lrel[list[&T], &E <: num] weightedDistribution(lrel[list[&T], &E <: num] M) = [ 
 	for ( s <- M, e := size(s) ) m += e;
 	return m;
 }
-
 
 /********************************************************************
 						Read File Functions
