@@ -14,7 +14,7 @@ import List;
 import ValueIO;
 import ListRelation;
 
-alias MatrixReg = tuple[ Matrix[int] fMatrix, RegMap fReg];
+alias MatrixReg = tuple[ Cluster[int] fCluster, RegMap fReg]; 
 
 /********************************************************************
 							Build Functions 
@@ -29,6 +29,7 @@ MatrixReg initMatrix(str version) =  <[],  labelRegMap( loadWordpressPluginSumma
 MatrixReg trainWithAllClasses(str version)
 {
 	MatrixReg M = initMatrix(version);
+	map[str, int] DL = readDL(); 
 
     pluginDirs = sort([l | l <- pluginDir.ls, isDirectory(l) ]);
     for (l <- pluginDirs, exists(getPluginBinLoc(l.file)), exists(infoBin+"<l.file>-hook-uses.bin")) {
@@ -43,26 +44,25 @@ MatrixReg trainWithAllClasses(str version)
 			{
 				list[NameOrExpr] fNames = featureList(psum, at);	
 				
-				M = insertSampleFeatures(fNames, psum, M);
+				M = insertSampleFeatures(fNames, psum, M, DL[l.file]); 
 			}
 		}
 	}
 	
-	Key key = reIndexKey( M.fMatrix, ( i : e   | <i,_,e> <- M.fReg ));
-	M.fMatrix = reIndexMatrix(M.fMatrix);
-		
+	Key key = reIndexKey( M.fCluster, ( i : e   | <i,_,e> <- M.fReg )); 
+	M.fCluster = reIndexMatrix(M.fCluster); 	
 	/* Save M to file */
-	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt", M.fMatrix);
+	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt", M.fCluster);
 	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt", key);
 	
-	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin", M.fMatrix);
+	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin", M.fCluster);
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin", key);
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-MatrixReg-<version>.bin", M);
 	return M ;
 }
 
 /* Insert all feature relationships shown in the provided PluginSummary */
-MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, MatrixReg M)
+MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, MatrixReg M, int w) 
 {	
 	/* Create a list of each feature's index in M */
 	list[int] fIndex = dup([ e | h <- fNames, e :=  getIndexList(h, psum, M.fReg), e >=0 ]);
@@ -70,7 +70,7 @@ MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, Matr
 	/* Do not add sample with < 2 hooks */
 	if(size(fIndex) <= 1) return M;	
 
-	M.fMatrix += [fIndex];
+	M.fCluster += [<fIndex, w>]; 
 	
 	return M;
 }

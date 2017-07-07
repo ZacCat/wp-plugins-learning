@@ -41,7 +41,7 @@ tuple[Cluster[int], Key] readTrans(int w, str version)
 
 tuple[list[AprioriMap], Key] genApriori(tuple[Cluster[int], Key] A, real sup) = <Apriori(A[0]), A[1]>;
 
-lrel[real, list[str], list[int]] tstApriori(tuple[list[AprioriMap], Key] A, list[int] q, int minSup) = predictApriori(A[0], q, A[1]);
+lrel[real, list[str], list[int]] tstApriori(tuple[list[AprioriMap], Key] A, list[int] q, int minSup) = predictApriori(A[0], q, A[1]); 
 
 /********************************************************************
 						Prediction Functions
@@ -50,7 +50,7 @@ lrel[real, list[str], list[int]] tstApriori(tuple[list[AprioriMap], Key] A, list
 /* TODO: Hash Tree */
 list[AprioriMap] Apriori(Cluster[int] T)
 {
-	real minW = sum(T<1>) * minSup + 0.0;
+  real minW = sum(T<1> + [0.00]) * minSup + 0.0; 
 
 	/* Candidates */
 	AprioriMap C = ( [s] : 0 | s <- {i | <s, _> <- T, i <- s});	
@@ -73,22 +73,22 @@ list[AprioriMap] Apriori(Cluster[int] T)
 	return L;
 }
 
-lrel[real, list[str], list[int]] predictApriori(list[AprioriMap] M, list[int] q, Key key)
+lrel[real, list[str], list[int]] predictApriori(list[AprioriMap] M, list[int] q, Key key) 
 {
-	real pThres = .2;
-	
+	real pThres = .2; 
+
 	lrel[list[int], real] p = [];
 	int i = size(q);
 	
 	/* q isn't frequent */
-	if( i >= size(M) || q notin M[i - 1] ) return [];
+	if( i >= size(M) || q notin M[i - 1] ) return []; 
 	
 	real qS = M[i - 1][q] + 0.0;
 	
-	for( k <- [0 .. size(M) - i ], n <- M[k],  j := i + k, e:= merge(n, q), e in M[j], v := M[j][e], v >= minSup )
+	for( k <- [0 .. size(M) - i ], n <- M[k],  j := i + k, e:= merge(n, q), e in M[j], v := M[j][e], v >= minSup ) 
 		p += <e, v / qS>;
 
-	return sort([ <e + 0.0, [key[f] | f <- s], s> | <n, e> <- p, s := n - q , e >= pThres ],bool(tuple[real, list[str], list[int]] a, tuple[real, list[str], list[int]]  b){ return a<0> > b<0>;});
+	return sort([ <e + 0.0, [key[f] | f <- s], s> | <n, e> <- p, s := n - q , e >= pThres ],bool(tuple[real, list[str], list[int]] a, tuple[real, list[str], list[int]]  b){ return a<0> > b<0>;}); 
 }
 
 /********************************************************************
@@ -105,5 +105,5 @@ AprioriMap calcWeights( AprioriMap C, Cluster[int] T)
 
 AprioriMap getValid( AprioriMap T, real minW ) = ( n : w | n <- T, w := T[n], w >= minW );
 
-AprioriMap genCombos( set[list[int]] C) = (dup(e) : 0 | <s, s1> <- C * C, s[..-1] == s1[..-1], s != s1, e:= merge(s, s1));
+AprioriMap genCombos( set[list[int]] C) = (dup(e) : 0 | <s, s1> <- C * C, s[..-1] == s1[..-1], s != s1, e:= merge(s, s1)); 
 

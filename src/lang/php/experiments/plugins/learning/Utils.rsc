@@ -13,8 +13,8 @@ import Relation;
 
 import util::Math;
 
-/* Number of predictions to compare */
-public int hVal = 10;
+/* Number of predictions to compare */ 
+public int hVal = 10; 
 
 /********************************************************************
 								Aliases
@@ -59,29 +59,29 @@ Matrix[&T] binarize( Matrix[&T] M)
    'val' represented with a 1 */
 list[int] testBinarize ( list[int] val, int sz ) = [ i in val ? 1 : 0 | i <- [0 .. sz]] ;
 
-Matrix[&T] reIndexMatrix( Matrix[&T] M )
+Cluster[&T] reIndexMatrix( Cluster[&T] M ) 
 {
-	list[&T] S = sort(dup([ i | s <- M, i <- s ]));
+	list[&T] S = sort(dup([ i | <s, _> <- M, i <- s ])); 
 	
 	/* map [ old value, new index  ] */
 	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
 		
-	Matrix[&T] ret = [[K[n] | n <- s ] | s <- M];
+	Cluster[&T] ret = [<[K[n] | n <- s ], w> | <s, w> <- M]; 
 	
 	return ret;
 }
 
-Key reIndexKey( Matrix[&T] M, map[&T, str] key )
+Key reIndexKey( Cluster[&T] M, map[&T, str] key ) 
 {
-	list[&T] S = sort(dup([ i | s <- M, i <- s ]));
+	list[&T] S = sort(dup([ i | <s, _> <- M, i <- s ])); 
 	
 	/* map [ old value, new index  ] */
 	map[ &T, int ] K = ( i : n | n <- index( S ), i := S[n] );
-
+		
 	return ( K[old] : key[old] | old <- K );
 }
 
-list[int] unBinarize(list[int] V) = [i | i <- index(V), V[i] == 1];
+list[int] unBinarize(list[int] V) = [i | i <- index(V), V[i] == 1]; 
 
 /********************************************************************
 							Mathematic Functions
@@ -91,9 +91,17 @@ list[int] unBinarize(list[int] V) = [i | i <- index(V), V[i] == 1];
 real dist( list[&T <: num] p, list[&T <: num] q )= sum([ d | i <- index(p),d := abs( p[i] - q[i] )]) + 0.0;
 
 /* Similarity Score */
-real sim( real maxD, real minD, real d, real w, real v) = ((maxD == minD) ? 1.0 : ((maxD - d)/ (maxD - minD))) * v * w;
+real sim( real maxD, real minD, real d, real maxW, real minW, real w, real v) 
+{ 
+  real D = ((maxD == minD) ? 1.0 : (( maxD - d )/ (maxD - minD)));  
+  real W = ((maxW == minW) ? 1.0 : (( w - minW ) / (maxW - minW)));  
+  //real W = ((maxW == minW) ? 1.0 :  1 - (( maxW - w ) / (maxW - minW)));  
+ 
+  return (D + W) / 2; 
+  //return D * W; 
+} 
 
-real listAvg( list[&T <: num] lst ) = sum(lst) / size(lst) + 0.0;
+real listAvg( list[&T <: num] lst ) = size(lst) == 0 ? 0.0 : sum(lst) / size(lst) + 0.0; 
 
 /********************************************************************
 						Matrix Functions
@@ -120,6 +128,7 @@ lrel[list[&T], &E <: num] weightedDistribution(lrel[list[&T], &E <: num] M) = [ 
 	for ( s <- M, e := size(s) ) m += e;
 	return m;
 }
+
 
 /********************************************************************
 						Read File Functions
@@ -199,3 +208,18 @@ int getStringIndex(str k, RegMap regexps){ for ( <i, _, n> <- regexps, n == k) r
    Unused */
 str getIndexListString(int k, RegMap regexps){ for ( <i, _, n> <- regexps, i == k) return n; }
 
+map[str, int] readDL(loc at) 
+{ 
+  /* Read a lrel[int, str] from file */ 
+ 
+  /* Should only be one line */ 
+  list[str] lines = readFileLines(at); 
+   
+  map[str, int] ret = (); 
+   
+  for(l <- lines, /<name:[^\t]+>\t<count:[0-9]+>/ := l) 
+    ret[name] = toInt(count); 
+   
+  return ret; 
+ 
+} 

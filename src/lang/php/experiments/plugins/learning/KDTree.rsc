@@ -44,7 +44,7 @@ lrel[real, str, int] tst(tuple[KDT, Key] K, list[int] p)
 							Build Functions 
 ********************************************************************/
 
-/* Generate a region that encompases all points in M */
+/* Generate a region that encompases all points */
 KRegion startKRegion( Matrix[real] M )
 {
 	KRegion B =  < M[0], M[0]>;
@@ -148,16 +148,16 @@ void updatePQ( tuple[real, real, list[real]] p )
 	}
 }
 
-lrel[real, str, int] predictKNN(KDT K, list[int] q, Key key, int sz)
-{
-	kNN(K, testBinarize(q, sz));
-	return predictNN(neighborPQ, key);
-}
+lrel[real, str, int] predictKNN(KDT K, list[int] q, Key key, int sz) 
+{ 
+  kNN(K, testBinarize(q, sz)); 
+  return predictNN(neighborPQ, key); 
+} 
 
 /* Perform Best Matching Neighbors using the nearest 
    Clusters/Transactions without narrowing by query 
    pattern*/
-lrel[real, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key)
+lrel[real, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key) 
 {
 	real maxD = max(M<0>);
 	real minD = min(M<0>);
@@ -168,7 +168,7 @@ lrel[real, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key)
 		for( n <- index(V), e := V[n], e > 0 )
 			ret[n] += sim(maxD, minD, d, w, e);
 	}
-	real sz = size(M) + 0.0;
+  real sz = size(M) + 0.0; 
 	return sort([ <e, key[n], n> | n <- index(ret), e := ret[n] / sz , e >= pThres ], bool(tuple[real,str,int] a, tuple[real,str,int]  b){ return a<0> > b<0>;});
 }
 
@@ -184,6 +184,7 @@ tuple[real, list[real]] midVector( int d, lrel[real, list[real]] M ) = M[sort([ 
 KRegion moveMax(KRegion B, int dim, real cut)
 {
 	B.max[dim] = cut;
+	
 	return B;
 }
 
