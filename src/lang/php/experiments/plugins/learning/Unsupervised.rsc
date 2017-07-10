@@ -21,7 +21,7 @@ alias MatrixReg = tuple[ Cluster[int] fCluster, RegMap fReg];
 ********************************************************************/
 
 /* Populate an empty Cluster */
-MatrixReg initMatrix(str version) =  <[],  labelRegMap( loadWordpressPluginSummary(version))>;
+MatrixReg initMatrix(str version) =  <[],  labelRegMap(loadWordpressPluginSummary(version))>;
 
 /* Create a new MatrixReg populated with information generated 
    from all plugins compatible with the given WordPress version,
@@ -29,13 +29,15 @@ MatrixReg initMatrix(str version) =  <[],  labelRegMap( loadWordpressPluginSumma
 MatrixReg trainWithAllClasses(str version)
 {
 	MatrixReg M = initMatrix(version);
-	map[str, int] DL = readDL(); 
-
+	map[str, int] downloadCounts = readDL(|file:///home/zac/git/wp-plugin-learning/extract/plugins/downloadCounts/downloadCount.txt|); 
+	
     pluginDirs = sort([l | l <- pluginDir.ls, isDirectory(l) ]);
+    /* For each plugin that is parsed and has resolved hooks */
     for (l <- pluginDirs, exists(getPluginBinLoc(l.file)), exists(infoBin+"<l.file>-hook-uses.bin")) {
  		
     	PluginSummary psum = loadPluginSummary(l.file);
- 
+ 		
+ 		/* if the plugin is tested upto the required version */
     	if (psum.pInfo is pluginInfo && just(maxVersion) := psum.pInfo.testedUpTo && maxVersion == version ) 
 		{		
 			println("Training with: <l.file>");
@@ -44,17 +46,18 @@ MatrixReg trainWithAllClasses(str version)
 			{
 				list[NameOrExpr] fNames = featureList(psum, at);	
 				
-				M = insertSampleFeatures(fNames, psum, M, DL[l.file]); 
+				M = insertSampleFeatures(fNames, psum, M, downloadCounts[l.file]); 
 			}
 		}
 	}
 	
 	Key key = reIndexKey( M.fCluster, ( i : e   | <i,_,e> <- M.fReg )); 
 	M.fCluster = reIndexMatrix(M.fCluster); 	
-	/* Save M to file */
-	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.txt", M.fCluster);
-	writeTextValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.txt", key);
+	println("Version <version> has size <size(M.fCluster)>");
+
+	if(size(M.fCluster) == 0)return <[], []>;
 	
+	/* Save M to file */
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-fMatrix-<version>.bin", M.fCluster);
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin", key);
 	writeBinaryValueFile(baseLoc + "/training/Unsupervised/TrainByClass-MatrixReg-<version>.bin", M);
@@ -62,7 +65,7 @@ MatrixReg trainWithAllClasses(str version)
 }
 
 /* Insert all feature relationships shown in the provided PluginSummary */
-MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, MatrixReg M, int w) 
+MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, MatrixReg M, int weight) 
 {	
 	/* Create a list of each feature's index in M */
 	list[int] fIndex = dup([ e | h <- fNames, e :=  getIndexList(h, psum, M.fReg), e >=0 ]);
@@ -70,7 +73,7 @@ MatrixReg insertSampleFeatures(list[NameOrExpr] fNames, PluginSummary psum, Matr
 	/* Do not add sample with < 2 hooks */
 	if(size(fIndex) <= 1) return M;	
 
-	M.fCluster += [<fIndex, w>]; 
+	M.fCluster += [<fIndex, weight>]; 
 	
 	return M;
 }

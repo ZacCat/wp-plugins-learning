@@ -44,7 +44,7 @@ lrel[real, str, int] tst(tuple[KDT, Key] K, list[int] p)
 							Build Functions 
 ********************************************************************/
 
-/* Generate a region that encompases all points */
+/* Generate a region that encompases all points in M */
 KRegion startKRegion( Matrix[real] M )
 {
 	KRegion B =  < M[0], M[0]>;
@@ -58,12 +58,19 @@ KRegion startKRegion( Matrix[real] M )
 }
 
 // TODO: Split dimension with highest spread to better balance tree
+
 /* Takes a list containing the label of each object and
-   a matrix of clusters and generates a kD-Tree */
+   a matrix of clusters and generates a kD-Tree. Essentially
+   determining the density of the points in each cluster. */
 KDT genKDT( list[real] L, Matrix[real] M, int d = 1 ) = genKDT(makeWeightRel(L,M));
-/* Takes a lrel [ weight, point ] and generates a kD-tree */
+
+/* Generates a region encompasing all points in M 
+   to use as the initial boundry for the KDT, and 
+   builds the KDT */
 KDT genKDT( lrel[real w, list[real] V] M, int d = 1 ) = genKDT(M, startKRegion(M<1>));
-/* Builds a KDT from a matrix */
+
+/* Builds a KDT from lrel [ weight, vector ], the region bounding
+   the list and the current dimension being split */
 KDT genKDT( lrel[real w, list[real] V] M, KRegion bound, int d = 1 )
 {
 	if (size( M ) == 1) return leaf(M[0].w, M[0].V);
@@ -154,9 +161,9 @@ lrel[real, str, int] predictKNN(KDT K, list[int] q, Key key, int sz)
   return predictNN(neighborPQ, key); 
 } 
 
-/* Perform Best Matching Neighbors using the nearest 
-   Clusters/Transactions without narrowing by query 
-   pattern*/
+/* Predict the likleyhood of each item using the nearest 
+   Clusters/Vectors and the similarity score defined in 
+   Utils. */
 lrel[real, str, int] predictNN(lrel[real d, real w, list[real] V]  M, Key key) 
 {
 	real maxD = max(M<0>);
@@ -224,11 +231,16 @@ bool isRegionClose(KRegion B, list[int] V)
 							General Utilities
 ********************************************************************/
 
-/* Use the density of each cluster as its weight */
-lrel[&T, &E] makeWeightRel( list[&T] w, list[&E] b){
-	return tolrel([ n + 0.0 | n <- sort(toList(distribution(w)))<1>], b);
+/* Generate a relation betewen each cluster and it's
+   weight useing the density of each cluster as its
+   weight. L is the label of each vector that has been
+   clustered and C is a list of the centriods of each 
+   cluster */
+lrel[&T, &E] makeWeightRel( list[&T] L, list[&E] C){
+	return tolrel([ n + 0.0 | n <- sort(toList(distribution(L)))<1>], C);
 }
 
+/* Interlaces a and b into a lrel */
 lrel[&T, &E] tolrel( list[&T] a, list[&E] b)
 {
 	if(size(a) != size(b))

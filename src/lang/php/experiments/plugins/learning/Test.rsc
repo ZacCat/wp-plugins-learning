@@ -13,12 +13,20 @@ import Set;
 import ValueIO; 
  
 import util::Math; 
-	 
+
 void testAll(str version) 
 { 
-	Cluster[int] fullM = readBinaryValueFile(#Cluster[int], baseLoc + "/training/Unsupervised/TrainByClass-fCluster-<version>.bin"); 
+	loc cLoc = baseLoc + "/training/Unsupervised/TrainByClass-fCluster-<version>.bin";
+	loc kLoc = baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin";
+	if(!exists(cLoc) || !exists(kLoc)) 
+	{
+		println("Version <version> not parsed");
+		return;
+	}
+	
+	Cluster[int] fullM = readBinaryValueFile(#Cluster[int], cLoc); 
 	unWM = [ <dup(s), 1> | <s, _> <- fullM]; 
-	Key key = readBinaryValueFile(#Key, baseLoc + "/training/Unsupervised/TrainByClass-Features-<version>.bin"); 
+	Key key = readBinaryValueFile(#Key,kLoc); 
 	 
 	//binM = binarize(fullM); 
 	Cluster[int] unBinM = [ <dup(s), w> | <s, w> <- fullM]; 
