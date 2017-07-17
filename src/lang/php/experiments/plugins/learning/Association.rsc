@@ -90,7 +90,7 @@ lrel[real, list[str], list[int]] predictApriori(list[AprioriMap] M, list[int] q,
 	/* if q isn't frequent */
 	if( querySize >= size(M) || q notin M[querySize - 1] ) return []; 
 	
-	real querySupport = M[i - 1][q] + 0.0;
+	real querySupport = M[querySize - 1][q] + 0.0;
 	
 	/* Scan M for frequent itemsets containing q
 	   that have a support >= the minimum support */
@@ -99,9 +99,9 @@ lrel[real, list[str], list[int]] predictApriori(list[AprioriMap] M, list[int] q,
 		int patternSize = querySize + k;
 		list[int] itemSet = merge(n, q);
 	
-		if(e notin M[patternSize] || M[patternSize][itemSet] < minSup) continue;
+		if(itemSet notin M[patternSize] || M[patternSize][itemSet] < minSup) continue;
 
-		p += <e, M[patternSize][itemSet] / querySupport>;
+		p += <itemSet, M[patternSize][itemSet] / querySupport>;
 	}
 	
 	return sort([ <e + 0.0, [key[f] | f <- s], s> | <n, e> <- p, s := n - q , e >= pThres ],bool(tuple[real, list[str], list[int]] a, tuple[real, list[str], list[int]]  b){ return a<0> > b<0>;}); 
