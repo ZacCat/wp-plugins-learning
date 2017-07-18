@@ -61,7 +61,6 @@ lrel[real, str, int] BMN( list[int] q, Cluster[&T <: num] C, Key key )
 		for( n <- index( q ), match, q[n] != 0, s[n] != q[n])	
 			match = false;
 
-
 		if( match )
 			p = isEmpty(p) ? [ v * w + 0.0 | v <- s ] : [ f | k <- index( s ), f:= p[k] + (w * s[k]) ];
 	}
@@ -77,10 +76,8 @@ lrel[real, str, int] BMN( list[int] q, Cluster[&T <: num] C, Key key )
 } 
  
 /* Best Matching Neighbors using unbinarized data */ 
-lrel[real, str, int] BMNunB( list[int] q, Cluster[&T <: num] C, Key key ) 
-{ 
-	real pThres = 0.1; 
- 
+lrel[real, str, int] BMNunB( list[int] q, Cluster[&T <: num] C, Key key, real pThres) 
+{  
 	map[int, real] p = (); 
 	for( <s, w>	<- C, q <= s, n <- s, n notin q ) 
 	{ 
@@ -89,7 +86,7 @@ lrel[real, str, int] BMNunB( list[int] q, Cluster[&T <: num] C, Key key )
 	} 
 
 	if(size(p) == 0) return []; 
-	 
+
 	real sumW = sum(C<1>) + 0.0; 
  
 	lrel[real, str, int] ret = sort([ <e, key[n], n> | n <- p, e := (p[n] +0.0) / sumW, e >= pThres], bool(tuple[real, str, int] a, tuple[real, str, int] b){ return a[0] > b[0];}); 
@@ -127,7 +124,7 @@ lrel[real, str, int] DistWeightedBMN( list[int] q, Cluster[&T <: num] C, Key key
 /* Predict the likleyhood of each item using the nearest 
 	 Clusters/Vectors and the similarity score defined in 
 	 Utils. */
-lrel[real, str, int] predictNN( lrel[real d, num w, list[int] V]	M, Key key, list[int] q) 
+lrel[real, str, int] predictNN( lrel[real d, num w, list[int] V] M, Key key, list[int] q) 
 {
 	real pThres = 0.1; 
 	
@@ -169,30 +166,31 @@ lrel[real, str, int] unBinDistWeightedBMN( list[int] q, Cluster[&T <: num] C, Ke
 lrel[real, str, int] unBinpredictNN( lrel[real d, real w, list[int] V]	M, Key key, list[int] q, real pThres) 
 { 
 	if(size(M) == 0) return []; 
+
 	real maxD = max(M<0>); 
 	real minD = min(M<0>); 
 	 
 	real maxW = max(M<1>); 
 	real minW = min(M<1>); 
-	 
-	map[int, real] ret = (); 
+	
+	map[int, real] ret = ();
+	real count = 1.0;
+	real prevD = 0.0;
 	for( <d, w, V> <- M, s := sim(maxD, minD, d, maxW, minW, w + 0.0, 1.0)) 
-	{ 
+	{
  		for( n <- V ) 
- 		{ 
- 			if(n in ret) ret[n] += s; 
-			else ret[n] = s; 
-			} 
-		} 
-	 
+ 		{
+ 			if(n in ret) ret[n] += s;
+			else ret[n] = s;
+		}
+	} 
+
 	//real sz = sum(M<1>) + 0.0; 
 	real sz = size(M) + 0.0; 
 	if(sz == 0) return []; 
-	 
 	lrel[real, str, int] res = sort([ <e, key[n], n> | n <- ret, n notin q, e := ret[n] / sz, e >= pThres], bool(tuple[real, str, int] a, tuple[real, str, int] b){ return a[0] > b[0];}); 
 	int h = size(res); 
 	if(h > hVal) res = head(res, hVal); 
-	 
 	return res; 
  }
 

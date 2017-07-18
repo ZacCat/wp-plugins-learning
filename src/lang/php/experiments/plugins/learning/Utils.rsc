@@ -14,7 +14,7 @@ import Relation;
 import util::Math;
 
 /* Number of predictions to compare */ 
-public int hVal = 10; 
+public int hVal = 10000; 
 
 /********************************************************************
 								Aliases
@@ -93,12 +93,13 @@ real dist( list[&T <: num] p, list[&T <: num] q )= sum([ d | i <- index(p),d := 
 /* Similarity Score */
 real sim( real maxD, real minD, real d, real maxW, real minW, real w, real v) 
 { 
-  real D = ((maxD == minD) ? 1.0 : (( maxD - d )/ (maxD - minD)));  
-  real W = ((maxW == minW) ? 1.0 : (( w - minW ) / (maxW - minW)));  
-  //real W = ((maxW == minW) ? 1.0 :  1 - (( maxW - w ) / (maxW - minW)));  
+	real D = ((maxD == minD) ? 1.0 : (( maxD - d )/ (maxD - minD))); 
  
-  return (D + W) / 2; 
-  //return D * W; 
+	real W = ((maxW == minW) ? 1.0 : (( w - minW ) / (maxW - minW)));  
+	//real W = ((maxW == minW) ? 1.0 :  1 - (( maxW - w ) / (maxW - minW)));  
+		 
+	return (D + W) / 2;
+	//return D * W;
 } 
 
 real listAvg( list[&T <: num] lst ) = size(lst) == 0 ? 0.0 : sum(lst) / size(lst) + 0.0; 
@@ -155,6 +156,7 @@ list[real] readPyList( loc at ) = [ toReal(s) | s <- readFileLines(at)];
 
 /* Return a list of feature names */
 list[NameOrExpr] featureList(PluginSummary psum, loc at) = [hn | <hn, e,_,_> <- (psum.filters + psum.actions), insideLoc(e, at), pp(hn) != ".*"];
+list[NameOrExpr] featureList(PluginSummary psum) = [hn | <hn, e,_,_> <- (psum.filters + psum.actions), pp(hn) != ".*"];
 
 /* Returns a RegMap of the hooks defined in WP */
 RegMap labelRegMap(PluginSummary wpsum)
